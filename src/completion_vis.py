@@ -352,7 +352,7 @@ def rgb_to_float(rgb):
 
 
 def visualize_point_clouds_with_bboxes_and_cameras(pc1, pc2=None, pc3=None, bboxes1=None, bboxes2=None, bboxes3=None,
-                                                   cameras1=None, cameras2=None, cameras3=None, 
+                                                   cameras1=None, cameras2=None, cameras3=None,
                                                    cameras4=None, paint_preds=True):
     """
     Display pairs of point clouds with optional bounding boxes and cameras using Open3D.
@@ -367,7 +367,10 @@ def visualize_point_clouds_with_bboxes_and_cameras(pc1, pc2=None, pc3=None, bbox
     cameras2 (np.ndarray, optional): Second array of camera locations and axes with shape [b, 3, 2].
     """
     b = len(pc1)
-    colours = [[202, 168, 245], [251, 86, 7], [2, 174, 174]]
+    #colours = [[251, 100, 10], [200, 200, 20], [2, 222, 174]] #red, yellow, green
+    colours = [ [150, 75, 150], [251, 86, 7], [2, 222, 174]]
+    #colours = [[251, 100, 10], [200, 200, 20], [2, 222, 174]]
+    #colours = [[202, 168, 245], [251, 86, 7], [2, 174, 174]]
     colours = [rgb_to_float(colour) for colour in colours]
 
     for i in range(b):
@@ -406,14 +409,14 @@ def visualize_point_clouds_with_bboxes_and_cameras(pc1, pc2=None, pc3=None, bbox
             bbox2_min = bboxes2[i, 0]
             bbox2_max = bboxes2[i, 1]
             bbox2 = o3d.geometry.AxisAlignedBoundingBox(min_bound=bbox2_min, max_bound=bbox2_max)
-            bbox2.color = colours[2]  # Green color for bbox2
+            bbox2.color = colours[1]  # Green color for bbox2
             geometries.append(bbox2)
 
         if bboxes3 is not None:
             bbox3_min = bboxes3[i, 0]
             bbox3_max = bboxes3[i, 1]
             bbox3 = o3d.geometry.AxisAlignedBoundingBox(min_bound=bbox3_min, max_bound=bbox3_max)
-            bbox3.color = colours[1]  # blue color for bbox3
+            bbox3.color = colours[2]  # blue color for bbox3
             geometries.append(bbox3)
 
 
