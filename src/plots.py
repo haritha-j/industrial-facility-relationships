@@ -20,7 +20,7 @@ def plot_error_graph(
     filtered_data = sorted_data[cap:]
     norm = np.linalg.norm(filtered_data, ord=1)
     norm_data = filtered_data / norm
-    print("avg", np.average(filtered_data), cap, filtered_data[0], filtered_data[-1])
+    print("avg", np.average(filtered_data), np.average(sorted_data), cap, filtered_data[0], filtered_data[-1])
 
     # draw graph
     fig = plt.figure(figsize=(12, 4))

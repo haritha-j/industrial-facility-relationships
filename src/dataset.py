@@ -166,7 +166,10 @@ class PointCloudData(Dataset):
             if file.endswith(".pcd") or file.endswith(".ply"):
                 sample = {}
                 sample["pcd_path"] = new_dir / file
-                sample["id"] = int(file.split(".")[0])
+                try:
+                    sample["id"] = int(file.split(".")[0])
+                except ValueError:
+                    sample["id"] = file.split(".")[0]
                 if not self.inference:
                     if category == "pipe":
                         (

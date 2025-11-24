@@ -33,8 +33,9 @@ def parse_args():
     parser = argparse.ArgumentParser('training')
     parser.add_argument('--use_cpu', action='store_true', default=False, help='use cpu mode')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
-    parser.add_argument('--batch_size', type=int, default=24, help='batch size in training')
-    parser.add_argument('--model', default='pointnet_cls', help='model name [default: pointnet_cls]')
+    parser.add_argument('--batch_size', type=int, default=64, help='batch size in training')
+    parser.add_argument('--model', default='PointAttn', help='model name [default: PointAttn]')
+    #parser.add_argument('--model', default='pointnet2_cls_ssg', help='model name [default: PointAttn]')
     parser.add_argument('--epoch', default=100, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--num_point', type=int, default=2048, help='Point Number')
@@ -99,12 +100,12 @@ def main(args):
                     ToTensor()
                     ])
 
-    cat = 'elbow'
+    cat = 'flange'
     train_ds = PointCloudData(path, category=cat, transform=train_transforms)
     valid_ds = PointCloudData(path, valid=True, folder='test', category=cat, transform=train_transforms)
     targets = train_ds.targets
-    trainDataLoader = torch.utils.data.DataLoader(dataset=train_ds, batch_size=64, shuffle=True)
-    testDataLoader = torch.utils.data.DataLoader(dataset=valid_ds, batch_size=64)
+    trainDataLoader = torch.utils.data.DataLoader(dataset=train_ds, batch_size=args.batch_size, shuffle=True)
+    testDataLoader = torch.utils.data.DataLoader(dataset=valid_ds, batch_size=args.batch_size)
     test_criterion = nn.MSELoss()
 
     '''CREATE DIR'''
@@ -118,7 +119,7 @@ def main(args):
     else:
         exp_dir = exp_dir.joinpath(args.log_dir)
     _make_dir(exp_dir)
-    checkpoints_dir = exp_dir.joinpath('checkpoints/')
+    checkpoints_dir = exp_dir.joinpath('checkpoints_pointattn/')
     _make_dir(checkpoints_dir)
     log_dir = exp_dir.joinpath('logs/')
     _make_dir(log_dir)
@@ -150,7 +151,7 @@ def main(args):
         criterion = criterion.cuda()
 
     try:
-        checkpoint = torch.load(str(exp_dir) + '/checkpoints/best_model.pth')
+        checkpoint = torch.load(str(exp_dir) + '/checkpoints_pointattn/best_model.pth')
         start_epoch = checkpoint['epoch']
         predictor.load_state_dict(checkpoint['model_state_dict'])
         log_string('Use pretrain model')
@@ -189,12 +190,14 @@ def main(args):
             points = points.transpose(2, 1)
 
             pred, trans_feat = predictor(points)
+            #print("pred", pred.shape, trans_feat.shape)
             loss = criterion(pred, target, trans_feat, points, cat)
+            #print("loss", loss)
 
             loss.backward()
             optimizer.step()
             global_step += 1
-        
+
         scheduler.step()
         log_string('Train loss: %f' % loss)
 
@@ -204,7 +207,7 @@ def main(args):
             if (loss <= best_loss):
                 best_loss = loss
                 best_epoch = epoch + 1
-     
+
             log_string('Test loss: %f' % (loss))
             log_string('Best loss: %f' % (best_loss))
 

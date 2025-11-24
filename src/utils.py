@@ -6,8 +6,8 @@ import pickle
 import open3d as o3d
 
 #from src.chamfer import *
-from src.visualisation import *
-
+from src.visualisation import visualize_predictions
+from src.chamfer import *
 
 def scale_preds(preds, cat, up=1, norm_factor=1, scale_positions=False):
     if up == 1:

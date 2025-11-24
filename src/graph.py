@@ -5,6 +5,7 @@ from tqdm import tqdm_notebook as tqdm
 import pickle
 import itertools
 import numpy as np
+import json
 
 # graph
 import dgl
@@ -12,10 +13,11 @@ from dgl.data import DGLDataset
 import torch
 
 from src.geometry import *
-from src.utils import *
+#from src.utils import *
 
 from src.cloud import element_to_cloud
-from src.centerline import flange_radius
+from src.utils import bp_tee_correction, undo_normalisation
+from src.chamfer import generate_elbow_cloud
 
 
 # TODO: Check these parameters
@@ -144,12 +146,12 @@ def get_features_from_params(path, dataset, cloi):
 
                 # tees require an additional level of normalisation since the dataset was
                 # resampled to avoid issues with capped ends
-                original_pred = bp_tee_correction(
-                    original_pred, class_metadata[str(ids[i])], cl
-                )
+                # original_pred = bp_tee_correction(original_pred, class_metadata[str(ids[i])], cl)
 
                 if cl == "tee":
-                    # original_pred = bp_tee_correction(original_pred, class_metadata[str(ids[i])], cl)
+                    original_pred = bp_tee_correction(
+                        original_pred, class_metadata[str(ids[i])], cl
+                        )
                     params = get_tee_features(original_pred)
                 elif cl == "elbow" or cl == "bend":
                     params = get_elbow_features(original_pred)

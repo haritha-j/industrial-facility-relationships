@@ -23,7 +23,6 @@ from chamferdist import ChamferDistance
 
 from src.geometry import *
 from src.elements import *
-from src.utils import scale_preds
 #from src.chamfer import *
 
 
@@ -238,6 +237,7 @@ def pcshow(xs, ys, zs):
 # visualise a pair of src and tgt points based on their predicted parameters
 # currently expects a 1:1mapping between src and tgt points.
 def visualise_parameter_pair(src_preds, tgt_preds, cat, blueprint, idx=0):
+    from src.utils import scale_preds
 
     # prepare data on gpu and setup optimiser
     cuda = torch.device("cuda")
@@ -333,10 +333,10 @@ def visualise_matching_points(src_cld, tgt_cld, blueprint, pairs=None, strength=
     # generate visualiser with blank ifc
     ifc = setup_ifc_file(blueprint)
     v = JupyterIFCRenderer(ifc, size=(700, 550))
-    
+
     add_cloud(v, src_cld.astype(np.float64), colour="#ff7070")
     add_cloud(v, tgt_cld.astype(np.float64), colour="#7070ff")
-    
+
     if same_cloud:
         tgt_cld = src_cld
 
@@ -384,7 +384,7 @@ def visualise_density(clouds, colormap_name='plasma'):
     clouds = torch.tensor(clouds, device="cuda")
     chamferDist = ChamferDistance()
     nn = chamferDist(clouds, clouds, bidirectional=False, return_nn=True, k=32)
-    
+
     # measure normalised density
     density = torch.mean(nn[0].dists[:,:,1:], dim=2)
     eps = 0.00001
@@ -393,7 +393,7 @@ def visualise_density(clouds, colormap_name='plasma'):
     diff = high - low
     density = (density - low) / diff
     density = density.detach().cpu().numpy()
-    
+
     # map colour
     colours = np.zeros((density.shape[0], density.shape[1], 4))
     colormap = plt.get_cmap(colormap_name)
@@ -406,7 +406,7 @@ def visualise_density(clouds, colormap_name='plasma'):
 
 
 # general function to plot multiple sets of values
-def plot_dists(ax, losses, labels, title, xlabel="point cloud index", ylabel="distance (log)", 
+def plot_dists(ax, losses, labels, title, xlabel="point cloud index", ylabel="distance (log)",
                log=True, limit=None, legend=True):
     if limit == None:
         limit = len(losses[0])

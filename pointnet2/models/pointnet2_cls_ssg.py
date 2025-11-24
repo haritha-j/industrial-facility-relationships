@@ -51,7 +51,7 @@ class get_loss(nn.Module):
         #chamfer_loss = get_chamfer_loss_tensor(pred, points, cat) * chamfer_scale
         chamfer_loss = get_chamfer_loss_from_param_tensor(pred, target, cat) * chamfer_scale
         #correspondence_loss = get_correspondence_loss_from_param_tensor(pred, target, cat)
-        #print("l", total_loss, chamfer_scale*correspondence_loss, 0.0005*ch_loss)
+        #print("l", total_loss, chamfer_loss)
 
         #return total_loss + chamfer_loss
         #return total_loss

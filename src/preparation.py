@@ -254,45 +254,49 @@ def create_completion_dataset(
     # print(test_point, len(unique_files), sorted(unique_files))
 
     for k, un in enumerate(tqdm(unique_files)):
-        
+
         # create ground truth
-        gt = []
-        for i in range(num_scans):
-            file_path = os.path.join(
-                pcd_path, (str(un) + "_" + str(i) + ".pcd")
-            )
-            pcd = o3d.io.read_point_cloud(file_path)
-            gt.append(pcd.points)
-        merged_gt = np.vstack(gt)
-        
-        # create partial clouds
-        for i in range(it_range):
-            points = []
-            for j in range(num_views):
+        try:
+            gt = []
+            for i in range(num_scans):
                 file_path = os.path.join(
-                    pcd_path, (str(un) + "_" + str(i + j) + ".pcd")
+                    pcd_path, (str(un) + "_" + str(i) + ".pcd")
                 )
                 pcd = o3d.io.read_point_cloud(file_path)
-                points.append(pcd.points)
+                gt.append(pcd.points)
+            merged_gt = np.vstack(gt)
 
-            # merged.points = o3d.utility.Vector3dVector(np.vstack(points))
-            merged_points = np.vstack(points)
-            if noise:
-                noisy_points = np.random.normal(0, noise_factor, (merged_points.shape))
-                subset = np.random.choice(
-                    range(merged_points.shape[0]),
-                    int(merged_points.shape[0] * noise_coverage),
-                    replace=False,
-                )
-                merged_points[subset] += noisy_points[subset]
+            # create partial clouds
+            for i in range(it_range):
+                points = []
+                for j in range(num_views):
+                    file_path = os.path.join(
+                        pcd_path, (str(un) + "_" + str(i + j) + ".pcd")
+                    )
+                    pcd = o3d.io.read_point_cloud(file_path)
+                    points.append(pcd.points)
 
-            if k < test_point:
-                train_clouds[str(count)] = merged_points
-                train_gt[str(count)] = merged_gt
-            else:
-                test_clouds[str(count)] = merged_points
-                test_gt[str(count)] = merged_gt
-            count += 1
+                # merged.points = o3d.utility.Vector3dVector(np.vstack(points))
+                merged_points = np.vstack(points)
+                if noise:
+                    noisy_points = np.random.normal(0, noise_factor, (merged_points.shape))
+                    subset = np.random.choice(
+                        range(merged_points.shape[0]),
+                        int(merged_points.shape[0] * noise_coverage),
+                        replace=False,
+                    )
+                    merged_points[subset] += noisy_points[subset]
+
+                if k < test_point:
+                    train_clouds[str(count)] = merged_points
+                    train_gt[str(count)] = merged_gt
+                else:
+                    test_clouds[str(count)] = merged_points
+                    test_gt[str(count)] = merged_gt
+                count += 1
+        except Exception as e:
+            print(f"Error processing element {un}: {e}")
+            continue
 
     # resample and save_data
     test_path = os.path.join(output_base, element_class, "test")
@@ -324,4 +328,3 @@ def create_completion_dataset(
             test_gt[k], density, uniform_sampling
         )
         save_cloud(sampled_points, test_path, k+"_gt")
-
