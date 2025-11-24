@@ -131,6 +131,34 @@ def parse_elbow_properties(element_data):
     )
 
 
+def parse_ibeam_properties(element_data):
+    scaled_targets = [
+        element_data["width"] / 1000,
+        element_data["depth"] / 1000,
+        element_data["web_thickness"] / 1000,
+        element_data["flange_thickness"] / 1000,
+        element_data["fillet_radius"] / 1000,
+        element_data["length"] / 1000,
+    ]
+    unscaled_targets = []
+
+    for i in range(3):
+        unscaled_targets.append(math.sin(element_data["direction"][i]))
+        unscaled_targets.append(math.cos(element_data["direction"][i]))
+
+    position_targets = [
+        element_data["position"][0] / 1000,
+        element_data["position"][1] / 1000,
+        element_data["position"][2] / 1000,
+    ]
+
+    return (
+        np.array(scaled_targets),
+        np.array(unscaled_targets),
+        np.array(position_targets),
+    )
+
+
 def default_transforms():
     return transforms.Compose([Normalize(), ToTensor()])
 
@@ -195,6 +223,12 @@ class PointCloudData(Dataset):
                             sample["unscaled_properties"],
                             sample["position_properties"],
                         ) = parse_tee_properties(metadata[file.split(".")[0]])
+                    elif category == "ibeam":
+                        (
+                            sample["scaled_properties"],
+                            sample["unscaled_properties"],
+                            sample["position_properties"],
+                        ) = parse_ibeam_properties(metadata[file.split(".")[0]])
                 self.files.append(sample)
 
         if not inference:

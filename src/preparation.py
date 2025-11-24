@@ -128,6 +128,8 @@ def synthetic_dataset(
             e = create_tee(config_data[element_class], ifc, ifc_info, blueprint)
         elif element_class == "flange":
             e = create_flange(config_data[element_class], ifc, ifc_info, blueprint)
+        elif element_class == "ibeam":
+            e = create_ibeam(config_data[element_class], ifc, ifc_info)
 
         metadata[str(i)] = e
         ifc.write(os.path.join(output_dir, "%d.ifc" % i))

@@ -139,3 +139,11 @@ output/
 gnn*
 pointnet2/data
 pointnet2/log
+cloi/
+completion/
+completion_noisy/
+occluded/
+completion_noisy_low_overlap/
+models/
+output2/
+tee_fix/
