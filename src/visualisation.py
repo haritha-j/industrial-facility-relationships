@@ -168,6 +168,80 @@ def visualize_predictions(
                 ifc_info,
             )
 
+        elif element == "ibeam":
+            pm = {
+                "width": preds[0],
+                "depth": preds[1],
+                "web_thickness": preds[2],
+                "flange_thickness": preds[3],
+                "fillet_radius": preds[4],
+                "length": preds[5],
+            }
+            pm["d"] = get_direction_from_trig(preds, 9)
+            pm["p"] = [preds[6] * 1000, preds[7] * 1000, preds[8] * 1000]
+
+            create_IfcIBeam(
+                pm["width"],
+                pm["depth"],
+                pm["web_thickness"],
+                pm["flange_thickness"],
+                pm["fillet_radius"],
+                pm["length"],
+                pm["d"],
+                pm["p"],
+                ifc,
+                ifc_info,
+            )
+
+        elif element == "lbeam":
+            pm = {
+                "width": preds[0],
+                "depth": preds[1],
+                "thickness": preds[2],
+                "fillet_radius": preds[3],
+                "length": preds[4],
+            }
+            pm["d"] = get_direction_from_trig(preds, 8)
+            pm["p"] = [preds[5] * 1000, preds[6] * 1000, preds[7] * 1000]
+
+            create_IfcLBeam(
+                pm["width"],
+                pm["depth"],
+                pm["thickness"],
+                pm["thickness"],
+                pm["fillet_radius"],
+                pm["length"],
+                pm["d"],
+                pm["p"],
+                ifc,
+                ifc_info,
+            )
+
+        elif element == "cbeam":
+            pm = {
+                "width": preds[0],
+                "depth": preds[1],
+                "wall_thickness": preds[2],
+                "girth": preds[3],
+                "fillet_radius": preds[4],
+                "length": preds[5],
+            }
+            pm["d"] = get_direction_from_trig(preds, 9)
+            pm["p"] = [preds[6] * 1000, preds[7] * 1000, preds[8] * 1000]
+
+            create_IfcCBeam(
+                pm["width"],
+                pm["depth"],
+                pm["wall_thickness"],
+                pm["girth"],
+                pm["fillet_radius"],
+                pm["length"],
+                pm["d"],
+                pm["p"],
+                ifc,
+                ifc_info,
+            )
+
     # ifc.write("temp.ifc")
     if visualize:
         return vis_ifc_and_cloud(ifc, clouds), ifc

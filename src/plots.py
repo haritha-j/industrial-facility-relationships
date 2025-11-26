@@ -137,3 +137,35 @@ def plot_parameter_errors(labels_list, preds_list, cat):
         )
         plot_single_parameter_error(labels_list, preds_list, 7, "direction", "axis1")
         plot_single_parameter_error(labels_list, preds_list, 13, "direction", "axis2")
+    elif cat == "ibeam":
+        plot_single_parameter_error(labels_list, preds_list, 0, "dimension", "width")
+        plot_single_parameter_error(labels_list, preds_list, 1, "dimension", "depth")
+        plot_single_parameter_error(labels_list, preds_list, 2, "dimension", "web_thickness")
+        plot_single_parameter_error(labels_list, preds_list, 3, "dimension", "flange_thickness")
+        plot_single_parameter_error(labels_list, preds_list, 4, "dimension", "fillet_radius")
+        plot_single_parameter_error(labels_list, preds_list, 5, "dimension", "length")
+        plot_single_parameter_error(
+            labels_list, preds_list, 6, "position", "position", radius_index=0
+        )
+        plot_single_parameter_error(labels_list, preds_list, 9, "direction", "axis")
+    elif cat == "lbeam":
+        plot_single_parameter_error(labels_list, preds_list, 0, "dimension", "width")
+        plot_single_parameter_error(labels_list, preds_list, 1, "dimension", "depth")
+        plot_single_parameter_error(labels_list, preds_list, 2, "dimension", "thickness")
+        plot_single_parameter_error(labels_list, preds_list, 3, "dimension", "fillet_radius")
+        plot_single_parameter_error(labels_list, preds_list, 4, "dimension", "length")
+        plot_single_parameter_error(
+            labels_list, preds_list, 5, "position", "position", radius_index=0
+        )
+        plot_single_parameter_error(labels_list, preds_list, 8, "direction", "axis")
+    elif cat == "cbeam":
+        plot_single_parameter_error(labels_list, preds_list, 0, "dimension", "width")
+        plot_single_parameter_error(labels_list, preds_list, 1, "dimension", "depth")
+        plot_single_parameter_error(labels_list, preds_list, 2, "dimension", "wall_thickness")
+        plot_single_parameter_error(labels_list, preds_list, 3, "dimension", "girth")
+        plot_single_parameter_error(labels_list, preds_list, 4, "dimension", "fillet_radius")
+        plot_single_parameter_error(labels_list, preds_list, 5, "dimension", "length")
+        plot_single_parameter_error(
+            labels_list, preds_list, 6, "position", "position", radius_index=0
+        )
+        plot_single_parameter_error(labels_list, preds_list, 9, "direction", "axis")

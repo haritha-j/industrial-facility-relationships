@@ -91,7 +91,7 @@ def main(args):
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
-    path = Path('output/')
+    path = Path('occluded/')
     #savepath = '/content/drive/MyDrive/ElementNet/'
     savepath = 'models/'
     train_transforms = transforms.Compose([
@@ -100,7 +100,7 @@ def main(args):
                     ToTensor()
                     ])
 
-    cat = 'flange'
+    cat = 'lbeam'
     train_ds = PointCloudData(path, category=cat, transform=train_transforms)
     valid_ds = PointCloudData(path, valid=True, folder='test', category=cat, transform=train_transforms)
     targets = train_ds.targets

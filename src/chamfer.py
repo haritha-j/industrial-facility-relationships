@@ -375,81 +375,81 @@ def get_circle_points_tensor(
 
     return ring_points
 
-def generate_ibeam_cloud(preds, scale=False):
-    """
-    Generate 3D point cloud for an I-beam similar to pipe generation pattern.
+# def generate_ibeam_cloud(preds, scale=False):
+#     """
+#     Generate 3D point cloud for an I-beam similar to pipe generation pattern.
 
-    :param preds: Array containing I-beam parameters:
-        [0]: width
-        [1]: depth
-        [2]: web_thickness
-        [3]: flange_thickness
-        [4]: fillet_radius
-        [5]: length
-        [6-8]: center point (x, y, z)
-        [9-11]: direction vector (or trig representation)
-    :param scale: If True, scale number of longitudinal points based on length
-    :return: numpy array of shape (N, 3) containing the 3D points
-    """
-    # Read parameters
-    width = preds[0]
-    depth = preds[1]
-    web_thickness = preds[2]
-    flange_thickness = preds[3]
-    fillet_radius = preds[4]
-    length = preds[5]
+#     :param preds: Array containing I-beam parameters:
+#         [0]: width
+#         [1]: depth
+#         [2]: web_thickness
+#         [3]: flange_thickness
+#         [4]: fillet_radius
+#         [5]: length
+#         [6-8]: center point (x, y, z)
+#         [9-11]: direction vector (or trig representation)
+#     :param scale: If True, scale number of longitudinal points based on length
+#     :return: numpy array of shape (N, 3) containing the 3D points
+#     """
+#     # Read parameters
+#     width = preds[0]
+#     depth = preds[1]
+#     web_thickness = preds[2]
+#     flange_thickness = preds[3]
+#     fillet_radius = preds[4]
+#     length = preds[5]
 
-    # Get center point
-    p0 = [preds[6], preds[7], preds[8]]
+#     # Get center point
+#     p0 = [preds[6], preds[7], preds[8]]
 
-    # Get direction vector (assuming it's directly provided at indices 9-11)
-    d = vector_normalise(np.array([preds[9], preds[10], preds[11]]))
+#     # Get direction vector (assuming it's directly provided at indices 9-11)
+#     d = vector_normalise(np.array([preds[9], preds[10], preds[11]]))
 
-    # Calculate start point (center the beam along its axis)
-    p = [p0[i] - ((length * d[i]) / 2) for i in range(3)]
+#     # Calculate start point (center the beam along its axis)
+#     p = [p0[i] - ((length * d[i]) / 2) for i in range(3)]
 
-    # Get new coordinate frame
-    old_z = np.array([0.0, 0.0, 1.0])
-    if np.isclose(np.dot(d, old_z), 1) or np.isclose(np.dot(d, old_z), -1):
-        old_z = np.array([0.0, 1.0, 0.0])
+#     # Get new coordinate frame
+#     old_z = np.array([0.0, 0.0, 1.0])
+#     if np.isclose(np.dot(d, old_z), 1) or np.isclose(np.dot(d, old_z), -1):
+#         old_z = np.array([0.0, 1.0, 0.0])
 
-    x_axis = vector_normalise(np.cross(d, old_z))
-    y_axis = vector_normalise(np.cross(d, x_axis))
+#     x_axis = vector_normalise(np.cross(d, old_z))
+#     y_axis = vector_normalise(np.cross(d, x_axis))
 
-    # Sample points along axis
-    if scale:
-        no_of_axis_points = int(50 * length / 1000.0) if length > 1000.0 else 20
-    else:
-        no_of_axis_points = 20
-    no_of_profile_points = 50
+#     # Sample points along axis
+#     if scale:
+#         no_of_axis_points = int(50 * length / 1000.0) if length > 1000.0 else 20
+#     else:
+#         no_of_axis_points = 20
+#     no_of_profile_points = 50
 
-    # Create I-beam profile
-    profile = IBeamSection(width, depth, web_thickness, flange_thickness, fillet_radius)
+#     # Create I-beam profile
+#     profile = IBeamSection(width, depth, web_thickness, flange_thickness, fillet_radius)
 
-    # Generate high-resolution profile for rotating sampling
-    high_res_profile = profile.get_sample_points(no_of_profile_points * 10)
+#     # Generate high-resolution profile for rotating sampling
+#     high_res_profile = profile.get_sample_points(no_of_profile_points * 10)
 
-    # Generate points along beam
-    points_3d = []
+#     # Generate points along beam
+#     points_3d = []
 
-    for i in range(no_of_axis_points):
-        # Position along axis
-        t = i / (no_of_axis_points - 1) if no_of_axis_points > 1 else 0
-        axis_pos = np.array(p) + t * length * d
+#     for i in range(no_of_axis_points):
+#         # Position along axis
+#         t = i / (no_of_axis_points - 1) if no_of_axis_points > 1 else 0
+#         axis_pos = np.array(p) + t * length * d
 
-        # Progressive offset for this slice
-        start_offset = i % 10
+#         # Progressive offset for this slice
+#         start_offset = i % 10
 
-        # Sample profile points for this cross-section
-        for j in range(no_of_profile_points):
-            idx = start_offset + j * 10
-            p2d = high_res_profile[idx]
+#         # Sample profile points for this cross-section
+#         for j in range(no_of_profile_points):
+#             idx = start_offset + j * 10
+#             p2d = high_res_profile[idx]
 
-            # Transform 2D profile point to 3D
-            point_3d = axis_pos + p2d[0] * x_axis + p2d[1] * y_axis
-            points_3d.append(point_3d)
+#             # Transform 2D profile point to 3D
+#             point_3d = axis_pos + p2d[0] * x_axis + p2d[1] * y_axis
+#             points_3d.append(point_3d)
 
-    return np.array(points_3d)
+#     return np.array(points_3d)
 
 # generate points on surface of flange
 def generate_flange_cloud_tensor(preds_tensor, disc=True):
@@ -927,8 +927,8 @@ def generate_ibeam_cloud_tensor(preds_tensor, n_longitudinal=20, n_profile=50):
     :param preds_tensor: Tensor of shape (batch_size, N) containing:
         - [0:5]: width, depth, web_thickness, flange_thickness, fillet_radius
         - [5]: length
-        - [6:9]: direction (or trig representation)
-        - [9:12]: center point (x, y, z)
+        - [6:9]:  center point (x, y, z)
+        - [9:15]: direction (trig representation)
     :param n_longitudinal: Number of cross-sections along beam axis
     :param n_profile: Number of points per cross-section
     :return: Tensor of shape (batch_size, n_longitudinal * n_profile, 3)
@@ -944,11 +944,16 @@ def generate_ibeam_cloud_tensor(preds_tensor, n_longitudinal=20, n_profile=50):
     fillet_radius = preds_tensor[:, 4]
     length = preds_tensor[:, 5]
 
-    # Get direction and center
-    d = F.normalize(preds_tensor[:, 6:9], dim=1)  # Assuming direction is given directly
-    center = preds_tensor[:, 9:12]
+    # Get center point
+    p0 = preds_tensor[:, 6:9]
 
-    # Get coordinate frame
+    # Get direction vector from trig representation
+    d = F.normalize(get_direction_from_trig_tensor(preds_tensor, 9), dim=1)
+
+    # Calculate start point (center the beam along its axis)
+    p = p0 + (d * length.unsqueeze(1) / 2)
+
+    # Get new coordinate frame
     old_z = torch.tensor([0.0, 0.0, 1.0], device=device).unsqueeze(0).expand(batch_size, 3)
     x_axis = F.normalize(torch.cross(d, old_z, dim=1))
     y_axis = F.normalize(torch.cross(d, x_axis, dim=1))
@@ -996,7 +1001,7 @@ def generate_ibeam_cloud_tensor(preds_tensor, n_longitudinal=20, n_profile=50):
     y_component = local_points[:, :, 1:2] * y_axis.unsqueeze(1)
     z_component = local_points[:, :, 2:3] * d.unsqueeze(1)
 
-    global_points = center.unsqueeze(1) + x_component + y_component + z_component
+    global_points = p.unsqueeze(1) + x_component + y_component + z_component
 
     return global_points
 
@@ -1100,6 +1105,411 @@ def generate_ibeam_profile_tensor(width, depth, web_thickness, flange_thickness,
     return profile_points
 
 
+def generate_lbeam_cloud_tensor(preds_tensor, n_longitudinal=20, n_profile=50):
+    """
+    Generate 3D point cloud for L-beams on GPU using PyTorch.
+
+    :param preds_tensor: Tensor of shape (batch_size, N) containing:
+        - [0]: width
+        - [1]: depth
+        - [2]: thickness
+        - [3]: fillet_radius
+        - [4]: length
+        - [5:8]: center point (x, y, z)
+        - [8:14]: trig representation
+    :param n_longitudinal: Number of cross-sections along beam axis
+    :param n_profile: Number of points per cross-section
+    :return: Tensor of shape (batch_size, n_longitudinal * n_profile, 3)
+    """
+    batch_size = preds_tensor.shape[0]
+    device = preds_tensor.device
+
+    # Extract parameters
+    width = preds_tensor[:, 0]
+    depth = preds_tensor[:, 1]
+    thickness = preds_tensor[:, 2]
+    fillet_radius = preds_tensor[:, 3]
+    length = preds_tensor[:, 4]
+
+    # Get center and direction
+    center = preds_tensor[:, 5:8]
+    d = F.normalize(get_direction_from_trig_tensor(preds_tensor, 8), dim=1)
+
+    # Calculate start point (center the beam along its axis)
+    p = center + (d * length.unsqueeze(1) / 2)
+
+    # Get coordinate frame
+    # Handle case where direction is parallel to Z-axis
+    ref_z = torch.tensor([0.0, 0.0, 1.0], device=device).unsqueeze(0).expand(batch_size, 3)
+    ref_y = torch.tensor([0.0, 1.0, 0.0], device=device).unsqueeze(0).expand(batch_size, 3)
+
+    # Check alignment with Z axis
+    dot_products = torch.abs(torch.sum(d * ref_z, dim=1))
+
+    # Use Y axis as reference where Z axis is parallel to direction
+    # Create a mask where direction is close to Z axis (dot product > 0.99)
+    mask = (dot_products > 0.99).unsqueeze(1)
+
+    # Select reference vector: ref_y if parallel to Z, else ref_z
+    ref_vector = torch.where(mask, ref_y, ref_z)
+
+    x_axis = F.normalize(torch.cross(d, ref_vector, dim=1))
+    y_axis = F.normalize(torch.cross(d, x_axis, dim=1))
+
+    # Generate high-resolution 2D L-beam profile (10x resolution)
+    profile_2d = generate_lbeam_profile_tensor(
+        width, depth, thickness, fillet_radius,
+        n_profile * 10, device
+    )  # Shape: (batch_size, n_profile*10, 2)
+
+    # Generate longitudinal positions
+    z_positions = torch.linspace(-0.5, 0.5, n_longitudinal, device=device)
+    z_positions = z_positions.unsqueeze(0).expand(batch_size, n_longitudinal)
+    z_positions = z_positions * length.unsqueeze(1)
+
+    # Apply rotating sampling pattern
+    points_3d = []
+    for i in range(n_longitudinal):
+        # Offset for this slice
+        start_offset = i % 10
+
+        # Sample every 10th point starting from offset
+        indices = torch.arange(start_offset, n_profile * 10, 10, device=device)
+        if len(indices) > n_profile:
+            indices = indices[:n_profile]
+
+        # Get profile points for this slice
+        profile_slice = profile_2d[:, indices, :]  # (batch_size, n_profile, 2)
+
+        # Get z coordinate for this slice
+        z = z_positions[:, i].unsqueeze(1).unsqueeze(2).expand(batch_size, n_profile, 1)
+
+        # Combine into 3D local coordinates (profile in XY, extrusion in Z)
+        local_points = torch.cat([profile_slice, z], dim=2)  # (batch_size, n_profile, 3)
+
+        points_3d.append(local_points)
+
+    # Stack all slices
+    local_points = torch.stack(points_3d, dim=1)  # (batch_size, n_longitudinal, n_profile, 3)
+    local_points = local_points.view(batch_size, n_longitudinal * n_profile, 3)
+
+    # Transform from local to global coordinates
+    # Global = center + local_x * x_axis + local_y * y_axis + local_z * d
+    x_component = local_points[:, :, 0:1] * x_axis.unsqueeze(1)
+    y_component = local_points[:, :, 1:2] * y_axis.unsqueeze(1)
+    z_component = local_points[:, :, 2:3] * d.unsqueeze(1)
+
+    global_points = p.unsqueeze(1) + x_component + y_component + z_component
+
+    return global_points
+
+
+def generate_lbeam_profile_tensor(width, depth, thickness, fillet_radius, n_points, device):
+    """
+    Generate 2D L-beam profile points for a batch of beams.
+
+    :param width, depth, etc.: Tensors of shape (batch_size,)
+    :param n_points: Number of points to sample around profile
+    :param device: torch device
+    :return: Tensor of shape (batch_size, n_points, 2) with (x, y) coordinates
+    """
+    batch_size = width.shape[0]
+
+    # Calculate profile dimensions (centered bounding box)
+    # Bounding box is [-width/2, width/2] x [-depth/2, depth/2]
+    w_half = width / 2.0
+    d_half = depth / 2.0
+
+    t = thickness
+    r = fillet_radius
+
+    # Define profile vertices (simplified - straight lines only for efficiency)
+    # Vertices in Counter-Clockwise order starting from bottom-right of horizontal leg
+    vertices = []
+
+    # 1. Bottom Right (Tip of horizontal leg)
+    vertices.append(torch.stack([w_half, -d_half], dim=1))
+
+    # 2. Top Right of bottom leg
+    vertices.append(torch.stack([w_half, -d_half + t], dim=1))
+
+    # 3. Start of fillet (on horizontal leg)
+    vertices.append(torch.stack([-w_half + t + r, -d_half + t], dim=1))
+
+    # 4. End of fillet (on vertical leg) - Chamfer approximation
+    vertices.append(torch.stack([-w_half + t, -d_half + t + r], dim=1))
+
+    # 5. Top Right of vertical leg
+    vertices.append(torch.stack([-w_half + t, d_half], dim=1))
+
+    # 6. Top Left (Tip of vertical leg)
+    vertices.append(torch.stack([-w_half, d_half], dim=1))
+
+    # 7. Bottom Left (Heel)
+    vertices.append(torch.stack([-w_half, -d_half], dim=1))
+
+    # Stack vertices: (batch_size, n_vertices, 2)
+    vertices = torch.stack(vertices, dim=1)
+    n_vertices = vertices.shape[1]
+
+    # Interpolate points along the profile perimeter
+    # Calculate segment lengths
+    segment_vectors = torch.roll(vertices, -1, dims=1) - vertices
+    segment_lengths = torch.norm(segment_vectors, dim=2)
+    total_length = segment_lengths.sum(dim=1, keepdim=True)
+
+    # Generate uniformly spaced points
+    target_distances = torch.linspace(0, 1, n_points, device=device).unsqueeze(0).expand(batch_size, n_points)
+    target_distances = target_distances * total_length
+
+    # Cumulative lengths
+    cumulative_lengths = torch.cumsum(segment_lengths, dim=1)
+    cumulative_lengths = torch.cat([torch.zeros(batch_size, 1, device=device), cumulative_lengths], dim=1)
+
+    # Find which segment each target distance falls into
+    profile_points = []
+    for i in range(n_points):
+        dist = target_distances[:, i].unsqueeze(1)
+
+        # Find segment (vectorized)
+        segment_idx = torch.searchsorted(cumulative_lengths.contiguous(), dist.contiguous()) - 1
+        segment_idx = torch.clamp(segment_idx, 0, n_vertices - 1).squeeze(1)
+
+        # Get segment start and end
+        batch_indices = torch.arange(batch_size, device=device)
+        start_points = vertices[batch_indices, segment_idx]
+        end_points = vertices[batch_indices, (segment_idx + 1) % n_vertices]
+
+        # Interpolate within segment
+        segment_start_dist = cumulative_lengths[batch_indices, segment_idx]
+        segment_end_dist = cumulative_lengths[batch_indices, segment_idx + 1]
+        segment_length = segment_end_dist - segment_start_dist
+
+        t = (dist.squeeze(1) - segment_start_dist) / (segment_length + 1e-8)
+        t = torch.clamp(t, 0, 1).unsqueeze(1)
+
+        point = start_points + t * (end_points - start_points)
+        profile_points.append(point)
+
+    profile_points = torch.stack(profile_points, dim=1)
+
+    return profile_points
+
+
+def generate_cbeam_cloud_tensor(preds_tensor, n_longitudinal=20, n_profile=50):
+    """
+    Generate 3D point cloud for C-beams on GPU using PyTorch.
+
+    :param preds_tensor: Tensor of shape (batch_size, N) containing:
+        - [0]: width
+        - [1]: depth
+        - [2]: wall_thickness
+        - [3]: girth
+        - [4]: fillet_radius
+        - [5]: length
+        - [6:9]: center point (x, y, z)
+        - [9:14]: or trig representation
+    :param n_longitudinal: Number of cross-sections along beam axis
+    :param n_profile: Number of points per cross-section
+    :return: Tensor of shape (batch_size, n_longitudinal * n_profile, 3)
+    """
+    batch_size = preds_tensor.shape[0]
+    device = preds_tensor.device
+
+    # Extract parameters
+    width = preds_tensor[:, 0]
+    depth = preds_tensor[:, 1]
+    wall_thickness = preds_tensor[:, 2]
+    girth = preds_tensor[:, 3]
+    fillet_radius = preds_tensor[:, 4]
+    length = preds_tensor[:, 5]
+
+    # Get center and direction
+    center = preds_tensor[:, 6:9]
+    d = F.normalize(get_direction_from_trig_tensor(preds_tensor, 9), dim=1)
+
+    # Calculate start point (center the beam along its axis)
+    p = center + (d * length.unsqueeze(1) / 2)
+
+    # Get coordinate frame
+    # Handle case where direction is parallel to Z-axis
+    ref_z = torch.tensor([0.0, 0.0, 1.0], device=device).unsqueeze(0).expand(batch_size, 3)
+    ref_y = torch.tensor([0.0, 1.0, 0.0], device=device).unsqueeze(0).expand(batch_size, 3)
+
+    # Check alignment with Z axis
+    dot_products = torch.abs(torch.sum(d * ref_z, dim=1))
+
+    # Use Y axis as reference where Z axis is parallel to direction
+    # Create a mask where direction is close to Z axis (dot product > 0.99)
+    mask = (dot_products > 0.99).unsqueeze(1)
+
+    # Select reference vector: ref_y if parallel to Z, else ref_z
+    ref_vector = torch.where(mask, ref_y, ref_z)
+
+    x_axis = F.normalize(torch.cross(d, ref_vector, dim=1))
+    y_axis = F.normalize(torch.cross(d, x_axis, dim=1))
+
+    # Generate high-resolution 2D C-beam profile (10x resolution)
+    profile_2d = generate_cbeam_profile_tensor(
+        width, depth, wall_thickness, girth, fillet_radius,
+        n_profile * 10, device
+    )  # Shape: (batch_size, n_profile*10, 2)
+
+    # Generate longitudinal positions
+    z_positions = torch.linspace(-0.5, 0.5, n_longitudinal, device=device)
+    z_positions = z_positions.unsqueeze(0).expand(batch_size, n_longitudinal)
+    z_positions = z_positions * length.unsqueeze(1)
+
+    # Apply rotating sampling pattern
+    points_3d = []
+    for i in range(n_longitudinal):
+        # Offset for this slice
+        start_offset = i % 10
+
+        # Sample every 10th point starting from offset
+        indices = torch.arange(start_offset, n_profile * 10, 10, device=device)
+        if len(indices) > n_profile:
+            indices = indices[:n_profile]
+
+        # Get profile points for this slice
+        profile_slice = profile_2d[:, indices, :]  # (batch_size, n_profile, 2)
+
+        # Get z coordinate for this slice
+        z = z_positions[:, i].unsqueeze(1).unsqueeze(2).expand(batch_size, n_profile, 1)
+
+        # Combine into 3D local coordinates (profile in XY, extrusion in Z)
+        local_points = torch.cat([profile_slice, z], dim=2)  # (batch_size, n_profile, 3)
+
+        points_3d.append(local_points)
+
+    # Stack all slices
+    local_points = torch.stack(points_3d, dim=1)  # (batch_size, n_longitudinal, n_profile, 3)
+    local_points = local_points.view(batch_size, n_longitudinal * n_profile, 3)
+
+    # Transform from local to global coordinates
+    # Global = center + local_x * x_axis + local_y * y_axis + local_z * d
+    x_component = local_points[:, :, 0:1] * x_axis.unsqueeze(1)
+    y_component = local_points[:, :, 1:2] * y_axis.unsqueeze(1)
+    z_component = local_points[:, :, 2:3] * d.unsqueeze(1)
+
+    global_points = p.unsqueeze(1) + x_component + y_component + z_component
+
+    return global_points
+
+
+def generate_cbeam_profile_tensor(width, depth, wall_thickness, girth, fillet_radius, n_points, device):
+    """
+    Generate 2D C-beam profile points for a batch of beams.
+
+    :param width, depth, etc.: Tensors of shape (batch_size,)
+    :param n_points: Number of points to sample around profile
+    :param device: torch device
+    :return: Tensor of shape (batch_size, n_points, 2) with (x, y) coordinates
+    """
+    batch_size = width.shape[0]
+
+    # Calculate profile dimensions (centered bounding box)
+    # Bounding box is [-width/2, width/2] x [-depth/2, depth/2]
+    w_half = width / 2.0
+    d_half = depth / 2.0
+
+    t = wall_thickness
+    g = girth
+    r = fillet_radius
+
+    # Define profile vertices (simplified - straight lines only for efficiency)
+    # Vertices in Counter-Clockwise order starting from Top Right Tip
+    vertices = []
+
+    # 1. Top Right Lip Tip (Outer)
+    vertices.append(torch.stack([w_half, d_half - g], dim=1))
+
+    # 2. Top Right Corner (Outer)
+    vertices.append(torch.stack([w_half, d_half], dim=1))
+
+    # 3. Top Left Corner (Outer)
+    vertices.append(torch.stack([-w_half, d_half], dim=1))
+
+    # 4. Bottom Left Corner (Outer)
+    vertices.append(torch.stack([-w_half, -d_half], dim=1))
+
+    # 5. Bottom Right Corner (Outer)
+    vertices.append(torch.stack([w_half, -d_half], dim=1))
+
+    # 6. Bottom Right Lip Tip (Outer)
+    vertices.append(torch.stack([w_half, -d_half + g], dim=1))
+
+    # 7. Bottom Right Lip Tip (Inner)
+    vertices.append(torch.stack([w_half - t, -d_half + g], dim=1))
+
+    # 8. Bottom Right Inner Corner
+    vertices.append(torch.stack([w_half - t, -d_half + t], dim=1))
+
+    # 9. Bottom Left Inner Corner (fillet start)
+    vertices.append(torch.stack([-w_half + t + r, -d_half + t], dim=1))
+
+    # 10. Inner Web Bottom (fillet end) - Chamfer approximation
+    vertices.append(torch.stack([-w_half + t, -d_half + t + r], dim=1))
+
+    # 11. Inner Web Top (fillet start)
+    vertices.append(torch.stack([-w_half + t, d_half - t - r], dim=1))
+
+    # 12. Top Left Inner Corner (fillet end)
+    vertices.append(torch.stack([-w_half + t + r, d_half - t], dim=1))
+
+    # 13. Top Right Inner Corner
+    vertices.append(torch.stack([w_half - t, d_half - t], dim=1))
+
+    # 14. Top Right Lip Tip (Inner)
+    vertices.append(torch.stack([w_half - t, d_half - g], dim=1))
+
+    # Stack vertices: (batch_size, n_vertices, 2)
+    vertices = torch.stack(vertices, dim=1)
+    n_vertices = vertices.shape[1]
+
+    # Interpolate points along the profile perimeter
+    # Calculate segment lengths
+    segment_vectors = torch.roll(vertices, -1, dims=1) - vertices
+    segment_lengths = torch.norm(segment_vectors, dim=2)
+    total_length = segment_lengths.sum(dim=1, keepdim=True)
+
+    # Generate uniformly spaced points
+    target_distances = torch.linspace(0, 1, n_points, device=device).unsqueeze(0).expand(batch_size, n_points)
+    target_distances = target_distances * total_length
+
+    # Cumulative lengths
+    cumulative_lengths = torch.cumsum(segment_lengths, dim=1)
+    cumulative_lengths = torch.cat([torch.zeros(batch_size, 1, device=device), cumulative_lengths], dim=1)
+
+    # Find which segment each target distance falls into
+    profile_points = []
+    for i in range(n_points):
+        dist = target_distances[:, i].unsqueeze(1)
+
+        # Find segment (vectorized)
+        segment_idx = torch.searchsorted(cumulative_lengths.contiguous(), dist.contiguous()) - 1
+        segment_idx = torch.clamp(segment_idx, 0, n_vertices - 1).squeeze(1)
+
+        # Get segment start and end
+        batch_indices = torch.arange(batch_size, device=device)
+        start_points = vertices[batch_indices, segment_idx]
+        end_points = vertices[batch_indices, (segment_idx + 1) % n_vertices]
+
+        # Interpolate within segment
+        segment_start_dist = cumulative_lengths[batch_indices, segment_idx]
+        segment_end_dist = cumulative_lengths[batch_indices, segment_idx + 1]
+        segment_length = segment_end_dist - segment_start_dist
+
+        t_val = (dist.squeeze(1) - segment_start_dist) / (segment_length + 1e-8)
+        t_val = torch.clamp(t_val, 0, 1).unsqueeze(1)
+
+        point = start_points + t_val * (end_points - start_points)
+        profile_points.append(point)
+
+    profile_points = torch.stack(profile_points, dim=1)
+
+    return profile_points
+
 
 def get_chamfer_dist_single(src, preds, cat):
     if cat == "elbow":
@@ -1132,8 +1542,8 @@ def get_chamfer_loss(preds_tensor, src_pcd_tensor, cat):
             target_pcd_list.append(generate_tee_cloud(preds))
         elif cat == "flange":
             target_pcd_list.append(generate_flange_cloud(preds))
-        elif cat == "ibeam":
-            target_pcd_list.append(generate_ibeam_cloud(preds))
+        # elif cat == "ibeam":
+        #     target_pcd_list.append(generate_ibeam_cloud(preds))
 
     target_pcd_tensor = torch.tensor(target_pcd_list).float().cuda()
     # t2 = time.perf_counter()
@@ -1160,6 +1570,10 @@ def get_shape_cloud_tensor(preds_tensor, cat):
         target_pcd_tensor = generate_socket_elbow_cloud_tensor(preds_tensor)
     elif cat == "ibeam":
         target_pcd_tensor = generate_ibeam_cloud_tensor(preds_tensor)
+    elif cat == "lbeam":
+        target_pcd_tensor = generate_lbeam_cloud_tensor(preds_tensor)
+    elif cat == "cbeam":
+        target_pcd_tensor = generate_cbeam_cloud_tensor(preds_tensor)
 
     return target_pcd_tensor
 
@@ -1493,6 +1907,13 @@ def get_chamfer_loss_from_param_tensor(preds_tensor, src_tensor, cat):
     elif cat == "ibeam":
         target_pcd_tensor = generate_ibeam_cloud_tensor(preds_tensor)
         src_pcd_tensor = generate_ibeam_cloud_tensor(src_tensor)
+    elif cat == "lbeam":
+        target_pcd_tensor = generate_lbeam_cloud_tensor(preds_tensor)
+        src_pcd_tensor = generate_lbeam_cloud_tensor(src_tensor)
+    elif cat == "cbeam":
+        target_pcd_tensor = generate_cbeam_cloud_tensor(preds_tensor)
+        src_pcd_tensor = generate_cbeam_cloud_tensor(src_tensor)
+
     chamferDist = ChamferDistance()
     bidirectional_dist = chamferDist(
         target_pcd_tensor, src_pcd_tensor, bidirectional=True
@@ -1522,6 +1943,12 @@ def get_correspondence_loss_from_param_tensor(preds_tensor, src_tensor, cat):
     elif cat == "ibeam":
         target_pcd_tensor = generate_ibeam_cloud_tensor(preds_tensor)
         src_pcd_tensor = generate_ibeam_cloud_tensor(src_tensor)
+    elif cat == "lbeam":
+        target_pcd_tensor = generate_lbeam_cloud_tensor(preds_tensor)
+        src_pcd_tensor = generate_lbeam_cloud_tensor(src_tensor)
+    elif cat == "cbeam":
+        target_pcd_tensor = generate_cbeam_cloud_tensor(preds_tensor)
+        src_pcd_tensor = generate_cbeam_cloud_tensor(src_tensor)
 
     l2_loss = torch.sum(torch.square(target_pcd_tensor - src_pcd_tensor), dim=(1, 2))
     l2_loss = l2_loss.mean()

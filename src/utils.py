@@ -41,6 +41,19 @@ def scale_preds(preds, cat, up=1, norm_factor=1, scale_positions=False):
         else:
             scalable_targets = [0, 1, 2, 3]
 
+    elif cat == "ibeam" or cat == "cbeam":
+        if scale_positions:
+            scalable_targets = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        else:
+            scalable_targets = [0, 1, 2, 3, 4, 5]
+
+    elif cat == "lbeam":
+        if scale_positions:
+            scalable_targets = [0, 1, 2, 3, 4, 5, 6, 7]
+        else:
+            scalable_targets = [0, 1, 2, 3, 4]
+
+
     for j in scalable_targets:
         preds[j] = preds[j] * scale_factor * norm_factor
 
@@ -57,6 +70,10 @@ def translate_preds(preds, cat, translation):
         targets = [3, 4, 5]
     elif cat == "pipe":
         targets = [2, 3, 4]
+    elif cat == "ibeam" or cat == "cbeam":
+        targets = [6, 7, 8]
+    elif cat == "lbeam":
+        targets = [5, 6, 7]
 
     for i, t in enumerate(targets):
         preds[t] = preds[t] + translation[i]

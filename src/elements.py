@@ -846,3 +846,387 @@ def create_ibeam(config, ifc, ifc_info):
     }
 
     return metadata
+
+
+# generate IfcBeam with L-beam profile from parameters
+def create_IfcLBeam(width, depth, web_thickness, flange_thickness, fillet_radius,
+                    length, direction, position, ifc, ifc_info):
+    """Create an IFC L-beam element."""
+    Z = 0.0, 0.0, 1.0
+
+    # Create L-beam profile
+    profile = ifc.create_entity("IfcLShapeProfileDef",
+        ProfileType="AREA",
+        Depth=depth,
+        Width=width,
+        Thickness=web_thickness,
+        FilletRadius=fillet_radius,
+        EdgeRadius=None,
+        LegSlope=None
+    )
+
+    # Create beam element
+    beam = ifc.createIfcBeam(create_guid(), ifc_info["owner_history"], "LBeam")
+    beam.ObjectType = "L-Beam"
+
+    # Set placement
+    beam_point = ifc.createIfcCartesianPoint(tuple(position))
+    beam_axis2placement = ifc.createIfcAxis2Placement3D(beam_point)
+    beam_axis2placement.Axis = ifc.createIfcDirection(direction)
+    beam_axis2placement.RefDirection = ifc.createIfcDirection(
+        np.cross(direction, Z).tolist()
+    )
+
+    beam_placement = ifc.createIfcLocalPlacement(
+        ifc_info["floor"].ObjectPlacement, beam_axis2placement
+    )
+    beam.ObjectPlacement = beam_placement
+
+    # Create extruded solid
+    beam_point2 = ifc.createIfcCartesianPoint((0.0, 0.0, 0.0))
+    beam_extrudeplacement = ifc.createIfcAxis2Placement3D(beam_point2)
+
+    beam_extruded = ifc.createIfcExtrudedAreaSolid()
+    beam_extruded.SweptArea = profile
+    beam_extruded.Position = beam_extrudeplacement
+    beam_extruded.ExtrudedDirection = ifc.createIfcDirection((0.0, 0.0, 1.0))
+    beam_extruded.Depth = length
+
+    # Create representation
+    beam_repr = ifc.createIfcShapeRepresentation()
+    beam_repr.ContextOfItems = ifc_info["context"]
+    beam_repr.RepresentationIdentifier = "Body"
+    beam_repr.RepresentationType = "SweptSolid"
+    beam_repr.Items = [beam_extruded]
+
+    beam_defshape = ifc.createIfcProductDefinitionShape()
+    beam_defshape.Representations = [beam_repr]
+    beam.Representation = beam_defshape
+
+    # Add to spatial structure
+    container = ifc.createIfcRelContainedInSpatialStructure(
+        create_guid(), ifc_info["owner_history"]
+    )
+    container.RelatedElements = [beam]
+    container.RelatingStructure = ifc_info["floor"]
+
+
+def lbeam_bbox(width, depth, thickness, length, direction):
+    """Calculate axis-aligned bounding box for L-beam."""
+    # L-beam can be approximated as a rectangular box for bbox purposes
+    half_width = width / 2
+    half_depth = depth / 2
+    half_length = length / 2
+
+    # Calculate vertices of bounding box in local coordinates
+    vertices = [
+        (-half_width, -half_depth, -half_length),
+        (half_width, -half_depth, -half_length),
+        (half_width, half_depth, -half_length),
+        (-half_width, half_depth, -half_length),
+        (-half_width, -half_depth, half_length),
+        (half_width, -half_depth, half_length),
+        (half_width, half_depth, half_length),
+        (-half_width, half_depth, half_length),
+    ]
+
+    # Rotate vertices if direction is not aligned with z-axis
+    if direction != (0, 0, 1):
+        iA = np.array([1.0, 0.0, 0.0])
+        jA = np.array([0.0, 1.0, 0.0])
+        kA = np.array([0.0, 0.0, 1.0])
+
+        kB = np.array(direction)
+        iB = np.cross(kB, kA)
+        iB = iB / np.linalg.norm(iB)
+        jB = np.cross(kB, iB)
+        jB = jB / np.linalg.norm(jB)
+
+        rotation_matrix = np.array([
+            [np.dot(iA, iB), np.dot(iA, jB), np.dot(iA, kB)],
+            [np.dot(jA, iB), np.dot(jA, jB), np.dot(jA, kB)],
+            [np.dot(kA, iB), np.dot(kA, jB), np.dot(kA, kB)],
+        ])
+
+        rotated_vertices = []
+        for vertex in vertices:
+            rotated_vertex = rotation_matrix @ vertex
+            rotated_vertices.append(rotated_vertex.tolist())
+        vertices = rotated_vertices
+
+    return bounding_box_dimensions(vertices)
+
+
+# generate a random synthetic L-beam
+def create_lbeam(config, ifc, ifc_info):
+    """
+    Generate a random synthetic L-beam element.
+
+    :param config: Configuration dictionary with parameter ranges
+    :param ifc: IFC file object
+    :param ifc_info: Dictionary containing owner_history, context, floor, etc.
+    :return: Dictionary of metadata
+    """
+    # Generate parameters within configured ranges
+    reject = True
+    while reject:
+        width = random.uniform(config["width_range"][0], config["width_range"][1])
+        depth = random.uniform(config["depth_range"][0], config["depth_range"][1])
+        thickness = random.uniform(
+            config["thickness_range"][0], config["thickness_range"][1]
+        )
+        fillet_radius = random.uniform(
+            config["fillet_radius_range"][0], config["fillet_radius_range"][1]
+        )
+        length = random.uniform(config["length_range"][0], config["length_range"][1])
+
+        # Basic validation: ensure sensible proportions
+        if (length / max(width, depth) > 2 and
+            thickness < width and
+            thickness < depth):
+            reject = False
+
+    # Generate random direction
+    d = []
+    for ax in config["extrusion_direction_range"]:
+        d.append(random.uniform(ax[0], ax[1]))
+    d_np = np.array(d)
+    d = (d_np / np.linalg.norm(d_np)).tolist()
+
+    # Generate random position
+    p = []
+    for coord in config["coordinate_range"]:
+        p.append(random.uniform(coord[0], coord[1]))
+
+    # Calculate bounding box
+    bbox_bounds = lbeam_bbox(width, depth, thickness, length, d)
+    bbox = [
+        bbox_bounds[1][0] - bbox_bounds[0][0],
+        bbox_bounds[1][1] - bbox_bounds[0][1],
+        bbox_bounds[1][2] - bbox_bounds[0][2]
+    ]
+    bbox_l2 = math.sqrt(bbox[0] * bbox[0] + bbox[1] * bbox[1] + bbox[2] * bbox[2])
+
+    # Normalize dimensions
+    width = 1000 * width / bbox_l2
+    depth = 1000 * depth / bbox_l2
+    thickness = 1000 * thickness / bbox_l2
+    fillet_radius = 1000 * fillet_radius / bbox_l2
+    length = 1000 * length / bbox_l2
+
+    # Center the element
+    centerpoint = [(p[i] + (length * d[i]) / 2) for i in range(3)]
+    p = [p[i] - centerpoint[i] for i in range(3)]
+
+    # Create the IFC L-beam
+    create_IfcLBeam(
+        width, depth, thickness, thickness, fillet_radius,
+        length, d, p, ifc, ifc_info
+    )
+
+    metadata = {
+        "width": width,
+        "depth": depth,
+        "thickness": thickness,
+        "fillet_radius": fillet_radius,
+        "length": length,
+        "direction": d,
+        "position": p
+    }
+
+    return metadata
+
+
+# generate IfcBeam with C-beam profile from parameters
+def create_IfcCBeam(width, depth, wall_thickness, girth, fillet_radius,
+                    length, direction, position, ifc, ifc_info):
+    """Create an IFC C-beam element."""
+    Z = 0.0, 0.0, 1.0
+
+    # Create C-beam profile
+    profile = ifc.create_entity("IfcCShapeProfileDef",
+        ProfileType="AREA",
+        Depth=depth,
+        Width=width,
+        WallThickness=wall_thickness,
+        Girth=girth,
+        InternalFilletRadius=fillet_radius
+    )
+
+    # Create beam element
+    beam = ifc.createIfcBeam(create_guid(), ifc_info["owner_history"], "CBeam")
+    beam.ObjectType = "C-Beam"
+
+    # Set placement
+    beam_point = ifc.createIfcCartesianPoint(tuple(position))
+    beam_axis2placement = ifc.createIfcAxis2Placement3D(beam_point)
+    beam_axis2placement.Axis = ifc.createIfcDirection(direction)
+    beam_axis2placement.RefDirection = ifc.createIfcDirection(
+        np.cross(direction, Z).tolist()
+    )
+
+    beam_placement = ifc.createIfcLocalPlacement(
+        ifc_info["floor"].ObjectPlacement, beam_axis2placement
+    )
+    beam.ObjectPlacement = beam_placement
+
+    # Create extruded solid
+    beam_point2 = ifc.createIfcCartesianPoint((0.0, 0.0, 0.0))
+    beam_extrudeplacement = ifc.createIfcAxis2Placement3D(beam_point2)
+
+    beam_extruded = ifc.createIfcExtrudedAreaSolid()
+    beam_extruded.SweptArea = profile
+    beam_extruded.Position = beam_extrudeplacement
+    beam_extruded.ExtrudedDirection = ifc.createIfcDirection((0.0, 0.0, 1.0))
+    beam_extruded.Depth = length
+
+    # Create representation
+    beam_repr = ifc.createIfcShapeRepresentation()
+    beam_repr.ContextOfItems = ifc_info["context"]
+    beam_repr.RepresentationIdentifier = "Body"
+    beam_repr.RepresentationType = "SweptSolid"
+    beam_repr.Items = [beam_extruded]
+
+    beam_defshape = ifc.createIfcProductDefinitionShape()
+    beam_defshape.Representations = [beam_repr]
+    beam.Representation = beam_defshape
+
+    # Add to spatial structure
+    container = ifc.createIfcRelContainedInSpatialStructure(
+        create_guid(), ifc_info["owner_history"]
+    )
+    container.RelatedElements = [beam]
+    container.RelatingStructure = ifc_info["floor"]
+
+
+def cbeam_bbox(width, depth, length, direction):
+    """Calculate axis-aligned bounding box for C-beam."""
+    # C-beam can be approximated as a rectangular box for bbox purposes
+    half_width = width / 2
+    half_depth = depth / 2
+    half_length = length / 2
+
+    # Calculate vertices of bounding box in local coordinates
+    vertices = [
+        (-half_width, -half_depth, -half_length),
+        (half_width, -half_depth, -half_length),
+        (half_width, half_depth, -half_length),
+        (-half_width, half_depth, -half_length),
+        (-half_width, -half_depth, half_length),
+        (half_width, -half_depth, half_length),
+        (half_width, half_depth, half_length),
+        (-half_width, half_depth, half_length),
+    ]
+
+    # Rotate vertices if direction is not aligned with z-axis
+    if direction != (0, 0, 1):
+        iA = np.array([1.0, 0.0, 0.0])
+        jA = np.array([0.0, 1.0, 0.0])
+        kA = np.array([0.0, 0.0, 1.0])
+
+        kB = np.array(direction)
+        iB = np.cross(kB, kA)
+        iB = iB / np.linalg.norm(iB)
+        jB = np.cross(kB, iB)
+        jB = jB / np.linalg.norm(jB)
+
+        rotation_matrix = np.array([
+            [np.dot(iA, iB), np.dot(iA, jB), np.dot(iA, kB)],
+            [np.dot(jA, iB), np.dot(jA, jB), np.dot(jA, kB)],
+            [np.dot(kA, iB), np.dot(kA, jB), np.dot(kA, kB)],
+        ])
+
+        rotated_vertices = []
+        for vertex in vertices:
+            rotated_vertex = rotation_matrix @ vertex
+            rotated_vertices.append(rotated_vertex.tolist())
+        vertices = rotated_vertices
+
+    return bounding_box_dimensions(vertices)
+
+
+# generate a random synthetic C-beam
+def create_cbeam(config, ifc, ifc_info):
+    """
+    Generate a random synthetic C-beam element.
+
+    :param config: Configuration dictionary with parameter ranges
+    :param ifc: IFC file object
+    :param ifc_info: Dictionary containing owner_history, context, floor, etc.
+    :return: Dictionary of metadata
+    """
+    # Generate parameters within configured ranges
+    reject = True
+    while reject:
+        width = random.uniform(config["width_range"][0], config["width_range"][1])
+        depth = random.uniform(config["depth_range"][0], config["depth_range"][1])
+        wall_thickness = random.uniform(
+            config["thickness_range"][0], config["thickness_range"][1]
+        )
+        girth = random.uniform(
+            config["girth_range"][0], config["girth_range"][1]
+        )
+        fillet_radius = random.uniform(
+            config["fillet_radius_range"][0], config["fillet_radius_range"][1]
+        )
+        length = random.uniform(config["length_range"][0], config["length_range"][1])
+
+        # Basic validation: ensure sensible proportions
+        if (length / max(width, depth) > 2 and
+            wall_thickness < width and
+            wall_thickness < depth and
+            girth < depth / 2 and
+            girth >= wall_thickness):
+            reject = False
+
+    # Generate random direction
+    d = []
+    for ax in config["extrusion_direction_range"]:
+        d.append(random.uniform(ax[0], ax[1]))
+    d_np = np.array(d)
+    d = (d_np / np.linalg.norm(d_np)).tolist()
+
+    # Generate random position
+    p = []
+    for coord in config["coordinate_range"]:
+        p.append(random.uniform(coord[0], coord[1]))
+
+    # Calculate bounding box
+    bbox_bounds = cbeam_bbox(width, depth, length, d)
+    bbox = [
+        bbox_bounds[1][0] - bbox_bounds[0][0],
+        bbox_bounds[1][1] - bbox_bounds[0][1],
+        bbox_bounds[1][2] - bbox_bounds[0][2]
+    ]
+    bbox_l2 = math.sqrt(bbox[0] * bbox[0] + bbox[1] * bbox[1] + bbox[2] * bbox[2])
+
+    # Normalize dimensions
+    width = 1000 * width / bbox_l2
+    depth = 1000 * depth / bbox_l2
+    wall_thickness = 1000 * wall_thickness / bbox_l2
+    girth = 1000 * girth / bbox_l2
+    fillet_radius = 1000 * fillet_radius / bbox_l2
+    length = 1000 * length / bbox_l2
+
+    # Center the element
+    centerpoint = [(p[i] + (length * d[i]) / 2) for i in range(3)]
+    p = [p[i] - centerpoint[i] for i in range(3)]
+
+    # Create the IFC C-beam
+    create_IfcCBeam(
+        width, depth, wall_thickness, girth, fillet_radius,
+        length, d, p, ifc, ifc_info
+    )
+
+    metadata = {
+        "width": width,
+        "depth": depth,
+        "wall_thickness": wall_thickness,
+        "girth": girth,
+        "fillet_radius": fillet_radius,
+        "length": length,
+        "direction": d,
+        "position": p
+    }
+
+    return metadata

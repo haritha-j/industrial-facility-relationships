@@ -236,5 +236,109 @@
                 100000.0
             ]
         ]
+    },
+    "lbeam": {
+        "width_range": [
+            50,
+            300
+        ],
+        "depth_range": [
+            50,
+            300
+        ],
+        "thickness_range": [
+            5,
+            30
+        ],
+        "fillet_radius_range": [
+            5,
+            30
+        ],
+        "length_range": [
+            500,
+            10000
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
+    },
+    "cbeam": {
+        "width_range": [
+            50,
+            300
+        ],
+        "depth_range": [
+            50,
+            300
+        ],
+        "thickness_range": [
+            5,
+            30
+        ],
+        "girth_range": [
+            5,
+            30
+        ],
+        "fillet_radius_range": [
+            5,
+            30
+        ],
+        "length_range": [
+            500,
+            10000
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
     }
 }
