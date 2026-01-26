@@ -20,7 +20,7 @@ def plot_error_graph(
     filtered_data = sorted_data[cap:]
     norm = np.linalg.norm(filtered_data, ord=1)
     norm_data = filtered_data / norm
-    print("avg", np.average(filtered_data), np.average(sorted_data), cap, filtered_data[0], filtered_data[-1])
+    print("avg", x, np.average(filtered_data), np.average(sorted_data), cap, filtered_data[0], filtered_data[-1])
 
     # draw graph
     fig = plt.figure(figsize=(12, 4))
@@ -102,7 +102,7 @@ def plot_single_parameter_error(
 def plot_parameter_errors(labels_list, preds_list, cat):
     if cat == "pipe":
         plot_single_parameter_error(labels_list, preds_list, 0, "dimension", "radius")
-        # plot_single_parameter_error(labels_list, preds_list, 1, 'dimension', 'length')
+        plot_single_parameter_error(labels_list, preds_list, 1, 'dimension', 'length')
         plot_single_parameter_error(
             labels_list, preds_list, 2, "position", "position", radius_index=0
         )

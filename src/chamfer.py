@@ -2146,7 +2146,7 @@ def get_jittery_cd_tensor(x, y, k=1, it=0):
     fps= False
 
     #jitter_size = int(64*(0.001*(1000-it)))+1
-    jitter_size = 2
+    jitter_size = 8
     print("jitter", jitter_size)
     perm1 = torch.randperm(x.size(1), device=cuda)[:jitter_size]
     perm2 = torch.randperm(x.size(1), device=cuda)[:jitter_size].unsqueeze(1)
@@ -2186,6 +2186,107 @@ def get_jittery_cd_tensor(x, y, k=1, it=0):
     #bidirectional_dist = bidirectional_dist + pair_dist
     bidirectional_dist = pair_dist
     bidirectional_dist = bidirectional_dist / (batch_size)
+
+    return bidirectional_dist
+
+
+# add jitter to the point correspondences in CD, but jitter among k nearest neighbors instead of all points
+# local_ratio controls the mix: 1.0 = fully local (knn), 0.0 = fully global (random)
+# Works for arbitrary batch sizes
+def get_jittery_knn_cd_tensor(x, y, k=8, it=0, local_ratio=.9):
+    cuda = torch.device("cuda")
+    chamferDist = ChamferDistance()
+
+    # Get k nearest neighbors instead of just 1
+    nn = chamferDist(
+        x, y, bidirectional=True, return_nn=True, k=k
+    )
+
+    # Use the closest neighbor for initial distance calculation
+    bidirectional_dist = torch.sum(nn[1].dists[:,:,0]) + torch.sum(nn[0].dists[:,:,0])
+    batch_size, point_count, _ = x.shape
+
+    jitter_size = 64
+    #jitter_size = int(64*(0.001*(1000-it)))+1
+    local_jitter_size = int(jitter_size * local_ratio)
+    global_jitter_size = jitter_size - local_jitter_size
+    print("jitter knn", jitter_size, "k", k, "local", local_jitter_size, "global", global_jitter_size)
+
+    # Use only the first neighbor column (keeping shape as [batch, points, 1])
+    nn_copy = nn[0].idx[:, :, 0].clone()  # Shape: [batch, points]
+
+    # Apply local jittering (from k nearest neighbors) - vectorized
+    if local_jitter_size > 0:
+        # Generate random point indices to jitter for each batch
+        perm1_local = torch.stack([torch.randperm(point_count, device=cuda)[:local_jitter_size]
+                                   for _ in range(batch_size)])  # Shape: [batch, local_jitter_size]
+
+        # Generate random neighbor indices for each selected point in each batch
+        random_neighbor_idx = torch.randint(0, k, (batch_size, local_jitter_size), device=cuda)  # Shape: [batch, local_jitter_size]
+
+        # Gather the k-NN indices for the selected points
+        # nn[0].idx shape: [batch, points, k]
+        selected_knn = torch.gather(nn[0].idx, 1, perm1_local.unsqueeze(2).expand(-1, -1, k))  # Shape: [batch, local_jitter_size, k]
+
+        # Select one random neighbor from the k nearest neighbors for each point
+        new_correspondences = torch.gather(selected_knn, 2, random_neighbor_idx.unsqueeze(2)).squeeze(2)  # Shape: [batch, local_jitter_size]
+
+        # Update nn_copy with the new correspondences
+        nn_copy.scatter_(1, perm1_local, new_correspondences)
+
+    # Apply global jittering (from anywhere in the cloud) - vectorized
+    if global_jitter_size > 0:
+        # Generate random point indices to jitter for each batch
+        perm1_global = torch.stack([torch.randperm(point_count, device=cuda)[:global_jitter_size]
+                                    for _ in range(batch_size)])  # Shape: [batch, global_jitter_size]
+
+        # Generate completely random correspondences for each batch
+        perm2_global = torch.stack([torch.randperm(point_count, device=cuda)[:global_jitter_size]
+                                    for _ in range(batch_size)])  # Shape: [batch, global_jitter_size]
+
+        # Update nn_copy with the random correspondences
+        nn_copy.scatter_(1, perm1_global, perm2_global)
+
+    # Gather paired points using batch-friendly indexing
+    # nn_copy shape: [batch, points], need to gather from y: [batch, points, 3]
+    paired_points_x_to_y = torch.gather(y, 1, nn_copy.unsqueeze(2).expand(-1, -1, 3))  # Shape: [batch, points, 3]
+    pair_dist_x_to_y = paired_points_x_to_y - x
+
+    # Reverse direction - same process for y to x
+    rnn_copy = nn[1].idx[:, :, 0].clone()  # Shape: [batch, points]
+
+    # Apply local jittering (from k nearest neighbors) - vectorized
+    if local_jitter_size > 0:
+        rperm1_local = torch.stack([torch.randperm(point_count, device=cuda)[:local_jitter_size]
+                                    for _ in range(batch_size)])
+
+        rrandom_neighbor_idx = torch.randint(0, k, (batch_size, local_jitter_size), device=cuda)
+
+        rselected_knn = torch.gather(nn[1].idx, 1, rperm1_local.unsqueeze(2).expand(-1, -1, k))
+
+        rnew_correspondences = torch.gather(rselected_knn, 2, rrandom_neighbor_idx.unsqueeze(2)).squeeze(2)
+
+        rnn_copy.scatter_(1, rperm1_local, rnew_correspondences)
+
+    # Apply global jittering (from anywhere in the cloud) - vectorized
+    if global_jitter_size > 0:
+        rperm1_global = torch.stack([torch.randperm(point_count, device=cuda)[:global_jitter_size]
+                                     for _ in range(batch_size)])
+
+        rperm2_global = torch.stack([torch.randperm(point_count, device=cuda)[:global_jitter_size]
+                                     for _ in range(batch_size)])
+
+        rnn_copy.scatter_(1, rperm1_global, rperm2_global)
+
+    # Gather paired points using batch-friendly indexing
+    rpaired_points_x_to_y = torch.gather(x, 1, rnn_copy.unsqueeze(2).expand(-1, -1, 3))
+    rpair_dist_x_to_y = rpaired_points_x_to_y - y
+
+    pair_dist = torch.sum(torch.square(pair_dist_x_to_y)) + torch.sum(torch.square(rpair_dist_x_to_y))
+
+    print("dist", bidirectional_dist.item(), pair_dist.item())
+    bidirectional_dist = pair_dist
+    bidirectional_dist = bidirectional_dist / (batch_size * point_count)
 
     return bidirectional_dist
 

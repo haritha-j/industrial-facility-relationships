@@ -190,7 +190,7 @@ def parse_cbeam_properties(element_data):
     scaled_targets = [
         element_data["width"] / 1000,
         element_data["depth"] / 1000,
-        element_data["thickness"] / 1000,
+        element_data["wall_thickness"] / 1000,
         element_data["girth"] / 1000,
         element_data["fillet_radius"] / 1000,
         element_data["length"] / 1000,
