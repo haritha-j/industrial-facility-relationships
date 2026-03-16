@@ -23,8 +23,8 @@ def morph_sphere(src_pcd_tensor, num_points, iterations, learning_rate, stops=[]
     if sphere:
         # gnerate sphere
         # Generate spherical coordinates
-        theta = np.linspace(0, 2 * np.pi, num_points)
-        phi = np.linspace(0, np.pi, num_points)
+        theta = np.linspace(0, 4 * np.pi, num_points)
+        phi = np.linspace(0, 2*np.pi, num_points)
 
         # Create a meshgrid from spherical coordinates
         theta, phi = np.meshgrid(theta, phi)
@@ -42,6 +42,11 @@ def morph_sphere(src_pcd_tensor, num_points, iterations, learning_rate, stops=[]
     else:
         sphere_points = torch.rand(1, num_points**2, 3, device=cuda,
                                    dtype=torch.double, requires_grad=True)
+        
+    # save sphere points as pcd
+    point_cloud = o3d.geometry.PointCloud() 
+    point_cloud.points = o3d.utility.Vector3dVector(sphere_points[0].cpu().detach().numpy())
+    o3d.io.write_point_cloud("sphere/sphere.pcd", point_cloud)
 
     # optimise
     optimizer = torch.optim.Adam([sphere_points], lr=learning_rate, betas=(0.95, 0.999))
@@ -82,7 +87,7 @@ def morph_sphere(src_pcd_tensor, num_points, iterations, learning_rate, stops=[]
         elif loss_func == "density":
             loss = calc_relative_density_loss_tensor(src_pcd_tensor, sphere_points, return_assignment=False)
         elif loss_func == "curvature":
-            loss = calc_balanced_curvature_loss_tensor(src_pcd_tensor, sphere_points, return_assignment=False)
+            loss = calc_poisson_ready_loss(src_pcd_tensor, sphere_points, k=16)
         elif loss_func == "cyclic":
             loss, assignment = calc_dcd_correspondence_tensor(src_pcd_tensor, sphere_points, return_assignment=True)
         else:
@@ -109,12 +114,91 @@ def morph_sphere(src_pcd_tensor, num_points, iterations, learning_rate, stops=[]
 #     if measure_consistency:
 #         with open("sphere/assignments_" + loss_func + ".pkl", "wb") as f:
 #             pickle.dump(assingments, f)
-
+    print("intermediate len", len(intermediate), intermediate[0].shape)
     intermediate = torch.stack(intermediate)
     if return_assignment:
         assignments = assignments
         return intermediate, losses, assignments
     return intermediate, losses
+
+
+def morph_shape(src_pcd_tensor, sphere_points, num_points, iterations, learning_rate, stops=[],
+                 loss_func= "chamfer", measure_consistency=True, sphere=True, return_assignment=True):
+
+    # optimise
+    optimizer = torch.optim.Adam([sphere_points], lr=learning_rate, betas=(0.95, 0.999))
+    intermediate, losses, assingments = [], [], []
+    chamferDist = ChamferDistance()
+    assignments = []
+
+    for i in tqdm(range(iterations)):
+        optimizer.zero_grad()
+
+        if loss_func == "chamfer":
+            nn = chamferDist(
+                src_pcd_tensor, sphere_points, bidirectional=True, return_nn=True)
+            loss = torch.sum(nn[1].dists) + torch.sum(nn[0].dists)
+            assignment = [nn[0].idx[:,:,0].detach().cpu().numpy(), nn[1].idx[:,:,0].detach().cpu().numpy()]
+        elif loss_func == "emd":
+            loss, assignment = calc_emd(sphere_points, src_pcd_tensor, 0.05, 50)
+            assignment = assignment.detach().cpu().numpy()
+        elif loss_func == "direct":
+            loss = torch.sum(torch.square(sphere_points -src_pcd_tensor))
+            assignment = None
+        elif loss_func == "pair":
+            loss, assignment = get_pair_loss_clouds_tensor(src_pcd_tensor, sphere_points, add_pair_loss=True, it=i)
+        elif loss_func == "jittery":
+            loss = get_jittery_knn_cd_tensor(src_pcd_tensor, sphere_points, k=16, it=i)
+        elif loss_func == "self":
+            loss = get_self_cd_tensor(src_pcd_tensor, sphere_points)
+        elif loss_func == "reverse":
+            loss, assignment = calc_reverse_weighted_cd_tensor(src_pcd_tensor, sphere_points, return_assignment=True, k=32)
+        elif loss_func == "prob":
+            loss, assignment = calc_pairing_probabilty_loss_tensor(src_pcd_tensor, sphere_points, k=64)
+        elif loss_func == "balanced":
+            loss, assignment = calc_balanced_chamfer_loss_tensor(src_pcd_tensor, sphere_points, return_assignment=True, k=32)
+        elif loss_func == "single":
+            loss, assignment = calc_balanced_single_chamfer_loss_tensor(src_pcd_tensor, sphere_points, return_assignment=True, k=32)
+        elif loss_func == "infocd":
+            loss, assignment = calc_cd_like_InfoV2(src_pcd_tensor, sphere_points, return_assignment=True)
+        elif loss_func == "density":
+            loss = calc_relative_density_loss_tensor(src_pcd_tensor, sphere_points, return_assignment=False)
+        elif loss_func == "curvature":
+            loss = calc_poisson_ready_loss(src_pcd_tensor, sphere_points, k=16)
+        elif loss_func == "cyclic":
+            loss, assignment = calc_dcd_correspondence_tensor(src_pcd_tensor, sphere_points, return_assignment=True)
+        else:
+            print("unspecified loss")
+
+        #print("a", assignment[0].shape)
+        loss.backward()
+        optimizer.step()
+        #print("iteration", i, "loss", loss.item())
+
+        if i in stops:
+            intermediate.append(sphere_points.clone())
+            losses.append(loss.item())
+            if measure_consistency:
+                assignments.append(assignment)
+
+    # calculate final chamfer loss
+    dist = chamferDist(
+                src_pcd_tensor, sphere_points, bidirectional=True)
+    emd_loss, _ = calc_emd(sphere_points, src_pcd_tensor, 0.05, 50)
+    print("final chamfer dist", dist.item(), "emd", emd_loss.item())
+
+    # save assignments for analysis
+#     if measure_consistency:
+#         with open("sphere/assignments_" + loss_func + ".pkl", "wb") as f:
+#             pickle.dump(assingments, f)
+    print("intermediate len", len(intermediate), intermediate[0].shape)
+    intermediate = torch.stack(intermediate)
+    if return_assignment:
+        assignments = assignments
+        return intermediate, losses, assignments
+    return intermediate, losses
+
+
 
 
 # morph a sphere into the shape of an input point cloud with jitter
@@ -228,10 +312,13 @@ def morph_sphere_with_jitter(src_pcd_tensor, num_points, iterations, learning_ra
     return intermediate, losses
 
 
-def run_morph(cld1_name, loss_func, lr=0.01):
+def run_morph(cld1_name, cld2_name, loss_func, lr=0.01):
     cuda = torch.device("cuda")
     cld1 = np.array(o3d.io.read_point_cloud(cld1_name).points)
     src_pcd_tensor = torch.tensor([cld1], device=cuda)
+
+    cld2 = np.array(o3d.io.read_point_cloud(cld2_name).points)
+    starting_pcd_tensor = torch.tensor([cld2], device=cuda, requires_grad=True)
 
     iterations = 1000
     #stops = [0, 10, 50, 100, 150, 500, 999]
@@ -241,6 +328,8 @@ def run_morph(cld1_name, loss_func, lr=0.01):
 #                                    return_assignment=False)
     morphed, losses = morph_sphere(src_pcd_tensor, 64, iterations, lr, stops, measure_consistency=False,
                                    loss_func=loss_func, return_assignment=False)
+    # morphed, losses = morph_shape(src_pcd_tensor, starting_pcd_tensor, 64, iterations, lr, stops, measure_consistency=False,
+    #                                loss_func=loss_func, return_assignment=False)
     # morphed, losses = morph_sphere_with_jitter(src_pcd_tensor, 64, iterations, lr, stops, measure_consistency=False,
     #                                loss_func=loss_func, return_assignment=False)
     morphed = torch.flatten(morphed, start_dim=1, end_dim=2)

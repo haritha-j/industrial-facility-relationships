@@ -1779,20 +1779,20 @@ def get_chamfer_loss_directional_tensor(
     target_pcd_tensor = get_shape_cloud_tensor(preds_tensor, cat)
 
     # compute loss
-    forward_dist = directional_chamfer_one_direction(src_pcd_tensor, target_pcd_tensor, k, direction_weight)
-    backward_dist = directional_chamfer_one_direction(target_pcd_tensor, src_pcd_tensor, k, direction_weight)
-    bidirectional_dist  = alpha*forward_dist + backward_dist
-    # chamferDist = ChamferDistance()
-    # bidirectional_dist = chamferDist(
-    #     target_pcd_tensor,
-    #     src_pcd_tensor,
-    #     bidirectional=False,
-    #     reduction=None,
-    #     alpha=alpha,
-    #     robust=robust,
-    #     delta=delta,
-    #     bidirectional_robust=bidirectional_robust,
-    # )
+    # forward_dist = directional_chamfer_one_direction(src_pcd_tensor, target_pcd_tensor, k, direction_weight)
+    # backward_dist = directional_chamfer_one_direction(target_pcd_tensor, src_pcd_tensor, k, direction_weight)
+    # bidirectional_dist  = alpha*forward_dist + backward_dist
+    chamferDist = ChamferDistance()
+    bidirectional_dist = chamferDist(
+        target_pcd_tensor,
+        src_pcd_tensor,
+        bidirectional=False,
+        reduction=None,
+        alpha=alpha,
+        robust=robust,
+        delta=delta,
+        bidirectional_robust=bidirectional_robust,
+    )
 
     #print("bidirectional_dist", bidirectional_dist.shape)
     #
@@ -3690,3 +3690,253 @@ def calc_dcd_correspondence_tensor(x, y, k=32, return_assignment=False, return_d
         return infocd, [min_ind_0.detach().cpu().numpy(), min_ind_1.detach().cpu().numpy()]
 
     return infocd
+
+
+# Chamfer distance with local eigenvector features
+# Computes eigenvectors from local neighborhoods and uses xyz + eigenvectors for matching
+def calc_eigenvector_chamfer_loss_tensor(x, y, k=15, return_assignment=False, return_dists=False):
+    """
+    A more stable variant that only uses eigenvalues (not eigenvectors) as features.
+    Eigenvalue gradients are more stable than eigenvector gradients.
+
+    The intuition: eigenvalues capture local shape (flat vs curved vs linear)
+    without the rotation-sensitivity issues of eigenvectors.
+    """
+    chamferDist = ChamferDistance()
+    eps = 1e-6
+    batch_size, point_count, _ = x.shape
+
+    # Find k nearest neighbors within each cloud
+    nn_x = chamferDist(x, x, bidirectional=False, return_nn=True, k=k+1)
+    nn_y = chamferDist(y, y, bidirectional=False, return_nn=True, k=k+1)
+
+    neighbor_idx_x = nn_x[0].idx[:, :, 1:]
+    neighbor_idx_y = nn_y[0].idx[:, :, 1:]
+
+    neighbors_x = torch.stack([x[i][neighbor_idx_x[i]] for i in range(batch_size)])
+    neighbors_y = torch.stack([y[i][neighbor_idx_y[i]] for i in range(batch_size)])
+
+    x_expanded = x.unsqueeze(2)
+    y_expanded = y.unsqueeze(2)
+    centered_neighbors_x = neighbors_x - x_expanded
+    centered_neighbors_y = neighbors_y - y_expanded
+
+    # Compute covariance
+    cov_x = torch.einsum('bpki,bpkj->bpij', centered_neighbors_x, centered_neighbors_x) / k
+    cov_y = torch.einsum('bpki,bpkj->bpij', centered_neighbors_y, centered_neighbors_y) / k
+
+    # Regularization with eigenvalue separation
+    reg_strength = 1e-3
+    diag_perturbation = torch.tensor([1.0, 0.9, 0.8], device=x.device, dtype=x.dtype)
+    reg = reg_strength * torch.diag(diag_perturbation).unsqueeze(0).unsqueeze(0)
+    cov_x = cov_x + reg
+    cov_y = cov_y + reg
+
+    # Use eigenvalues only (more stable than full SVD for gradients)
+    # torch.linalg.eigvalsh is for symmetric matrices and is more stable
+    eigenvalues_x = torch.linalg.eigvalsh(cov_x)  # (batch, num_points, 3)
+    eigenvalues_y = torch.linalg.eigvalsh(cov_y)
+
+    # Clamp eigenvalues
+    eigenvalues_x = torch.clamp(eigenvalues_x, min=eps, max=10.0)
+    eigenvalues_y = torch.clamp(eigenvalues_y, min=eps, max=10.0)
+
+    # Normalize
+    eigenval_sum_x = eigenvalues_x.sum(dim=-1, keepdim=True) + eps
+    eigenval_sum_y = eigenvalues_y.sum(dim=-1, keepdim=True) + eps
+    eigenval_features_x = eigenvalues_x / eigenval_sum_x
+    eigenval_features_y = eigenvalues_y / eigenval_sum_y
+
+    # Also compute geometric descriptors from eigenvalues (more interpretable)
+    # Linearity: (λ1 - λ2) / λ1 - high for edges/lines
+    # Planarity: (λ2 - λ3) / λ1 - high for flat surfaces
+    # Sphericity: λ3 / λ1 - high for isotropic/spherical regions
+    lambda1_x, lambda2_x, lambda3_x = eigenvalues_x[..., 2], eigenvalues_x[..., 1], eigenvalues_x[..., 0]
+    lambda1_y, lambda2_y, lambda3_y = eigenvalues_y[..., 2], eigenvalues_y[..., 1], eigenvalues_y[..., 0]
+
+    linearity_x = (lambda1_x - lambda2_x) / (lambda1_x + eps)
+    planarity_x = (lambda2_x - lambda3_x) / (lambda1_x + eps)
+    sphericity_x = lambda3_x / (lambda1_x + eps)
+
+    linearity_y = (lambda1_y - lambda2_y) / (lambda1_y + eps)
+    planarity_y = (lambda2_y - lambda3_y) / (lambda1_y + eps)
+    sphericity_y = lambda3_y / (lambda1_y + eps)
+
+    geo_features_x = torch.stack([linearity_x, planarity_x, sphericity_x], dim=-1)
+    geo_features_y = torch.stack([linearity_y, planarity_y, sphericity_y], dim=-1)
+
+    # Concatenate xyz with eigenvalue-based features
+    geo_weight = 0.1
+    augmented_x = torch.cat([x, eigenval_features_x * geo_weight, geo_features_x * geo_weight], dim=-1)
+    augmented_y = torch.cat([y, eigenval_features_y * geo_weight, geo_features_y * geo_weight], dim=-1)
+
+    # Compute Chamfer distance
+    nn_augmented = chamferDist(
+        augmented_x,
+        augmented_y,
+        bidirectional=True,
+        return_nn=True,
+        k=1
+    )
+
+    dist_x_to_y = nn_augmented[0].dists[:, :, 0]
+    dist_y_to_x = nn_augmented[1].dists[:, :, 0]
+
+    chamfer_loss = (torch.sum(dist_x_to_y) + torch.sum(dist_y_to_x)) / (batch_size * point_count)
+
+    if return_assignment:
+        idx_x_to_y = nn_augmented[0].idx[:, :, 0]
+        idx_y_to_x = nn_augmented[1].idx[:, :, 0]
+        return chamfer_loss, [idx_x_to_y.detach().cpu().numpy(), idx_y_to_x.detach().cpu().numpy()]
+
+    if return_dists:
+        return chamfer_loss, dist_x_to_y, dist_y_to_x
+
+    return chamfer_loss
+
+
+def calc_poisson_ready_loss(x, y, k=8,
+                            w_repulsion=0.5,
+                            w_planarity=0.1,
+                            w_normal=0.1,
+                            w_curvature=1.0):
+
+    batch_size, n_x, _ = x.shape
+    _, n_y, _ = y.shape
+
+    # --- Helper: Batch Gather Neighbors ---
+    def gather_neighbors(points, idx):
+        """
+        points: (B, N, 3)
+        idx: (B, N, K)
+        Returns: (B, N, K, 3)
+        """
+        B, N, C = points.shape
+        _, _, K = idx.shape
+
+        # Flatten batch and point dimensions to use absolute indexing
+        points_flat = points.reshape(B * N, C)
+
+        # Create batch offsets so index 0 in batch 1 refers to index N in the flat array
+        batch_offsets = torch.arange(B, device=points.device) * N
+        batch_offsets = batch_offsets.view(B, 1, 1)
+
+        # Add offsets to local indices
+        absolute_idx = idx + batch_offsets
+
+        # Gather and reshape back
+        neighbors_flat = points_flat[absolute_idx.view(-1)]
+        return neighbors_flat.view(B, N, K, C)
+
+    # --- Helper: Estimate Geometric Features ---
+    def get_geometric_features(points, k_neighbors):
+        chamferDist = ChamferDistance()
+
+        # Self-KNN (k+1 because the closest point is the point itself)
+        nn_obj = chamferDist(points, points, k=k_neighbors+1, return_nn=True)
+
+        # 1. Get Indices and Distances
+        # We slice [:, :, 1:] to remove the point itself (index 0, dist 0)
+        neighbor_idx = nn_obj[0].idx[:, :, 1:]    # (B, N, k)
+        neighbor_dists = nn_obj[0].dists[:, :, 1:] # (B, N, k)
+
+        # 2. Gather actual coordinates using the correction
+        neighbors = gather_neighbors(points, neighbor_idx) # (B, N, k, 3)
+
+        # 3. Center the neighbors (Local PCA)
+        centered = neighbors - points.unsqueeze(2)
+
+        # 4. Compute Covariance Matrix: (B, N, 3, 3)
+        cov = torch.matmul(centered.transpose(2, 3), centered) / k_neighbors
+
+        # 5. Eigen decomposition
+        # eigh returns eigenvalues in ascending order
+        e_vals, e_vecs = torch.linalg.eigh(cov)
+
+        # Normals = Smallest eigenvector
+        estimated_normals = e_vecs[:, :, :, 0]
+
+        # Curvature = lambda_min / sum(lambdas)
+        curvature = e_vals[:, :, 0] / (torch.sum(e_vals, dim=-1) + 1e-8)
+
+        return estimated_normals, curvature, e_vals[:, :, 0], neighbor_dists, neighbor_idx
+
+    # --- Step 1: Analyze Geometry ---
+    # Note: We need the neighbor_dists from X specifically for the Repulsion Loss
+    norm_x, curve_x, min_eig_x, self_dists_x, _ = get_geometric_features(x, k)
+    norm_y, curve_y, min_eig_y, _, _            = get_geometric_features(y, k)
+
+    # --- Step 2: Calculate Standard DCD (Density-aware CD) ---
+    chamferDist = ChamferDistance()
+    nn_xy = chamferDist(x, y, bidirectional=True, return_nn=True, k=k)
+
+    eps = 1e-6
+
+    # DCD Logic (unchanged from your snippet logic)
+    softmaxed_0 = F.softmax(1.0 / (nn_xy[0].dists + eps), dim=-1)
+    softmaxed_1 = F.softmax(1.0 / (nn_xy[1].dists + eps), dim=-1)
+
+    point_weights_1 = torch.zeros(batch_size, n_y, device=x.device, dtype=x.dtype)
+    for i in range(batch_size):
+        point_weights_1[i].scatter_add_(0, nn_xy[0].idx[i].flatten(), softmaxed_0[i].flatten())
+
+    point_weights_0 = torch.zeros(batch_size, n_x, device=x.device, dtype=x.dtype)
+    for i in range(batch_size):
+        point_weights_0[i].scatter_add_(0, nn_xy[1].idx[i].flatten(), softmaxed_1[i].flatten())
+
+    # Gather weights for each neighbor - need to expand point_weights to match neighbor indices
+    # nn_xy[0].idx has shape (B, n_x, k) with values in range [0, n_y)
+    # nn_xy[1].idx has shape (B, n_y, k) with values in range [0, n_x)
+    corresponding_weights_0 = torch.gather(point_weights_1.unsqueeze(2).expand(-1, -1, k), 1, nn_xy[0].idx)
+    corresponding_weights_1 = torch.gather(point_weights_0.unsqueeze(2).expand(-1, -1, k), 1, nn_xy[1].idx)
+
+    _, i0 = torch.min(corresponding_weights_0, dim=2)
+    _, i1 = torch.min(corresponding_weights_1, dim=2)
+
+    min_dist_1 = torch.gather(nn_xy[1].dists, 2, i1.unsqueeze(2))[:, :, 0]
+    min_dist_0 = torch.gather(nn_xy[0].dists, 2, i0.unsqueeze(2))[:, :, 0]
+
+    # --- MODIFICATION: Curvature-Aware Weighting ---
+    # Find which ground truth point (in Y) corresponds to each point in X
+    # i0 is an index into the k neighbors, we need the actual Y point index
+    closest_y_idx = torch.gather(nn_xy[0].idx, 2, i0.unsqueeze(2))[:, :, 0]  # (B, n_x)
+
+    # Map curvature of Y onto X - closest_y_idx contains indices into Y
+    matched_curve_y = torch.gather(curve_y, 1, closest_y_idx)  # (B, n_x)
+
+    weight_map_x = 1.0 + (w_curvature * matched_curve_y)
+    weight_map_y = 1.0 + (w_curvature * curve_y)
+
+    term_x_to_y = torch.sum(torch.sqrt(min_dist_0) * weight_map_x)
+    term_y_to_x = torch.sum(torch.sqrt(min_dist_1) * weight_map_y)
+
+    dcd = (term_x_to_y + term_y_to_x) / (batch_size * n_x)
+
+    # --- MODIFICATION: Planarity Loss ---
+    loss_planarity = torch.mean(min_eig_x)
+
+    # --- MODIFICATION: Repulsion Loss ---
+    # Uses self_dists_x derived from Step 1 (which now correctly excludes the self-loop)
+    h = 0.02 # Tune this based on your point cloud scale
+    loss_repulsion = torch.mean(torch.exp(-self_dists_x / (h**2)))
+
+    # --- MODIFICATION: Normal Consistency Loss ---
+    # Align normal of X with normal of closest Y
+    # norm_y has shape (B, n_y, 3), closest_y_idx has shape (B, n_x)
+    # We need to gather from norm_y using closest_y_idx
+    matched_norm_y = torch.gather(
+        norm_y,
+        1,
+        closest_y_idx.unsqueeze(2).expand(-1, -1, 3)
+    )  # (B, n_x, 3)
+
+    cosine_sim = torch.abs(torch.sum(norm_x * matched_norm_y, dim=-1))
+    loss_normal = torch.mean(1.0 - cosine_sim)
+
+    # --- Final Sum ---
+    total_loss = dcd + \
+                 (w_planarity * loss_planarity) + \
+                 (w_repulsion * loss_repulsion) + \
+                 (w_normal * loss_normal)
+
+    return total_loss

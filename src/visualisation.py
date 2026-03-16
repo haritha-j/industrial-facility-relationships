@@ -7,6 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from tqdm.notebook import tqdm
+import matplotlib.colors as mcolors
+import numpy as np
 
 from OCC.Core.gp import gp_Pnt
 from utils.JupyterIFCRenderer import JupyterIFCRenderer
@@ -23,7 +25,7 @@ from chamferdist import ChamferDistance
 
 from src.geometry import *
 from src.elements import *
-#from src.chamfer import *
+from src.chamfer import *
 
 
 # covert rgb to hex value
@@ -385,8 +387,8 @@ def add_lines_colour(v, src, tgt, pairs=None, k=1, strength=None):
     if strength is None: strength = [1.0 for i in range(len(pairs[0]))]
 
     print(len(strength))
-    colour_intensity = [int(255 * s) for s in strength]
-    colour = [rgb_to_hex(100, c, 0) for c in colour_intensity]
+    colour_intensity = [int(255 * (1.0 - s)) for s in strength]
+    colour = [rgb_to_hex(int(255 * s), int(165 * (1.0 - s) + 100 * s), 0) for s in strength]
     for i in range(len(tgt)):
         positions = [[src[i], tgt[pairs[j][i]]] for j in range(k)]
 
@@ -399,6 +401,47 @@ def add_lines_colour(v, src, tgt, pairs=None, k=1, strength=None):
 
     v._displayed_non_pickable_objects.add(lines)
 
+def plot_distance_colorbar(src_cld, tgt_cld, pairs=None):
+    """
+    Display a colour scale bar showing the distance-to-colour mapping.
+    Green = small distance, Orange = large distance.
+    """
+    # compute distances
+    if pairs is not None:
+        tgt_matched = tgt_cld[pairs]
+    else:
+        tgt_matched = tgt_cld
+
+    distances = np.linalg.norm(src_cld - tgt_matched, axis=1)
+    #max_dist = distances.max()
+    max_dist = 0.1433
+    min_dist = 0
+
+    # build matching colormap: green (0) -> orange (1)
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        "dist_cmap",
+        [
+            (0.0, (0/255, 165/255, 0/255)),    # green  (s=0, small distance)
+            (1.0, (255/255, 100/255, 0/255)),   # orange (s=1, large distance)
+        ]
+    )
+
+    fig, ax = plt.subplots(figsize=(5, 1))
+    fig.subplots_adjust(bottom=0.5)
+
+    norm = mcolors.Normalize(vmin=min_dist, vmax=max_dist)
+    cb = fig.colorbar(
+        plt.cm.ScalarMappable(norm=norm, cmap=cmap),
+        cax=ax,
+        orientation="horizontal",
+    )
+    cb.set_label("Euclidean distance", fontsize=12)
+    cb.set_ticks([min_dist, max_dist])
+    cb.set_ticklabels([f"{min_dist:.4f}", f"{max_dist:.4f}"])
+
+    plt.title("Correspondence distance (m)", fontsize=12)
+    plt.show()
+
 
 # visually show matching points
 # pairs is a list of indices of the matching points in tgt cloud to src cloud
@@ -408,19 +451,25 @@ def visualise_matching_points(src_cld, tgt_cld, blueprint, pairs=None, strength=
     ifc = setup_ifc_file(blueprint)
     v = JupyterIFCRenderer(ifc, size=(700, 550))
 
-    add_cloud(v, src_cld.astype(np.float64), colour="#ff7070")
-    add_cloud(v, tgt_cld.astype(np.float64), colour="#7070ff")
+    add_cloud(v, src_cld.astype(np.float64), colour="#0887DB")
+    add_cloud(v, tgt_cld.astype(np.float64), colour="#000000")
 
     if same_cloud:
         tgt_cld = src_cld
 
-    # add elements to visualiser
+    # compute strength as normalised euclidean distances if not provided
     if strength is None:
-        add_lines(v, src_cld, tgt_cld, pairs=pairs)
-    else:
-        add_lines_colour(v, src_cld, tgt_cld, pairs=pairs, strength=strength, k=k)
+        distances = np.linalg.norm(src_cld - tgt_cld, axis=1)
+        d_min, d_max = 0, 0.1433
+        if d_max - d_min > 0:
+            strength = (distances - d_min) / (d_max - d_min)
+        else:
+            strength = np.zeros(len(src_cld))
 
-    #print(src_cld.shape, type(src_cld[0][0]), tgt_cld.shape, type(tgt_cld))
+    # add elements to visualiser
+    plot_distance_colorbar(src_cld, tgt_cld)
+    add_lines_colour(v, src_cld, tgt_cld, pairs=pairs, strength=strength, k=k)
+
     return v
 
 
@@ -448,7 +497,9 @@ def visualise_loss(src_cld, tgt_cld, blueprint, loss="chamfer", strength=None, k
             print("int", nn[0].idx[0][:,0].detach().cpu().numpy().shape)
             pairs = [nn[0].idx[0][:,i].detach().cpu().numpy() for i in range(k)]
 
+
     return visualise_matching_points(src_cld, tgt_cld, blueprint, pairs=pairs, strength=strength, k=k, same_cloud=same_cloud)
+
 
 
 # produce a colour map based on the density of a point cloud
@@ -458,6 +509,7 @@ def visualise_density(clouds, colormap_name='plasma'):
     clouds = torch.tensor(clouds, device="cuda")
     chamferDist = ChamferDistance()
     nn = chamferDist(clouds, clouds, bidirectional=False, return_nn=True, k=32)
+    print("processing density")
 
     # measure normalised density
     density = torch.mean(nn[0].dists[:,:,1:], dim=2)
