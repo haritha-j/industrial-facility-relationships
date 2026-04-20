@@ -12,6 +12,8 @@ if __name__ == '__main__':
     #parser.add_argument('ifcconvert_dir')
     args = parser.parse_args()
 
+    # Create output directory if it doesn't exist
+    os.makedirs(args.output_dir, exist_ok=True)
 
     files = os.listdir(args.input_dir)
     metadata_path = args.output_dir + "occluded.json"

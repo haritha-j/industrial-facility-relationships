@@ -161,7 +161,7 @@ def create_elbow(config, ifc, ifc_info, blueprint, i):
         1 * centerpoint[1] * 1000 / bbox_l2,
         1 * centerpoint[0] * 1000 / bbox_l2,
     ]
-    print("SD P", p)
+    #print("SD P", p)
 
     # old_z = (0., 0., 1.)
     # x_axis = np.cross(d, old_z).tolist()
@@ -182,7 +182,7 @@ def create_elbow(config, ifc, ifc_info, blueprint, i):
     # p = [-1* centerpoint[2]*1000/bbox_l2, 0., 0.]
 
     r, x, y = r / bbox_l2, x / bbox_l2, y / bbox_l2
-    print("p", p, "c", centerpoint, r, x)
+    #print("p", p, "c", centerpoint, r, x)
 
     # print('bb befpre', bbox, 'c', centerpoint, bbox_l2)
     # bbox2, centerpoint2 = elbow_bbox(r, a, d, p, x, y, axis_dir,blueprint)
@@ -204,6 +204,8 @@ def create_elbow(config, ifc, ifc_info, blueprint, i):
     # print(metadata, axis_ang)
 
     return metadata
+
+
 
 
 # generate Ifc tee from parameters
@@ -247,6 +249,7 @@ def create_IfcTee(r1, r2, l1, l2, d1, d2, p1, p2, ifc, ifc_info, bp=True):
         owner_history=ifc_info["owner_history"],
         context=ifc_info["context"],
     )
+
 
 
 # generate Ifc tee without element substraction, only for bbox
@@ -639,7 +642,7 @@ def create_pipe(config, ifc, ifc_info):
     bbox = pipe_bbox(r, l, d)
     bbox_l2 = math.sqrt(bbox[0] * bbox[0] + bbox[1] * bbox[1] + bbox[2] * bbox[2])
     r, l = 1000 * r / bbox_l2, 1000 * l / bbox_l2
-    print(bbox_l2)
+    #print(bbox_l2)
     # bbox2 = pipe_bbox(r,l,d)
     # print(bbox, bbox2, (bbox2[0]*bbox2[0] + bbox2[1]*bbox2[1] + bbox2[2]*bbox2[2]))
 

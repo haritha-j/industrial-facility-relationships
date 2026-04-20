@@ -1,0 +1,344 @@
+{
+    "tee": {
+        "radius1_range": [
+            40,
+            4000
+        ],
+        "radius2_percentage_range": [
+            0.4,
+            1.0
+        ],
+        "same_radius_prob": 0.6,
+        "tee_right_angle_prob": 0.8,
+        "tee_placement_angle_range": [
+            0,
+            6.283
+        ],
+        "tee_angle_range": [
+            0.524,
+            2.618
+        ],
+        "length1_range": [
+            80,
+            20000
+        ],
+        "length2_percentage_range": [
+            0.2,
+            0.5
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
+    },
+    "elbow": {
+        "radius_range": [
+            40,
+            4000
+        ],
+        "angle_range": [
+            30,
+            180
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ],
+        "axis_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "curvature_range": [
+            8.0,
+            20.0
+        ],
+        "axis_angle_range": [
+            0,
+            6.283
+        ]
+    },
+    "pipe": {
+        "radius_range": [
+            40,
+            4000
+        ],
+        "length_range": [
+            400,
+            40000.0
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
+    },
+    "flange": {
+        "radius_range": [
+            40,
+            4000
+        ],
+        "radius2_percentage_range":[
+            0.2,
+            0.6
+        ],
+
+        "length_percentage_range": [
+            0.2,
+            1.0
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ]
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
+    },
+    "ibeam": {
+        "width_range": [
+            400,
+            2000
+        ],
+        "depth_range": [
+            400,
+            2400
+        ],
+        "web_thickness_range": [
+            20,
+            120
+        ],
+        "flange_thickness_range": [
+            32,
+            160
+        ],
+        "fillet_radius_range": [
+            40,
+            200
+        ],
+        "length_range": [
+            2000,
+            40000
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
+    },
+    "lbeam": {
+        "width_range": [
+            200,
+            1200
+        ],
+        "depth_range": [
+            200,
+            1200
+        ],
+        "thickness_range": [
+            20,
+            120
+        ],
+        "fillet_radius_range": [
+            20,
+            120
+        ],
+        "length_range": [
+            2000,
+            40000
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
+    },
+    "cbeam": {
+        "width_range": [
+            200,
+            1200
+        ],
+        "depth_range": [
+            200,
+            1200
+        ],
+        "thickness_range": [
+            20,
+            120
+        ],
+        "girth_range": [
+            20,
+            120
+        ],
+        "fillet_radius_range": [
+            20,
+            120
+        ],
+        "length_range": [
+            2000,
+            40000
+        ],
+        "extrusion_direction_range": [
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                -1.0,
+                1.0
+            ],
+            [
+                0.0,
+                1.0
+            ]
+        ],
+        "coordinate_range": [
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ],
+            [
+                -100000.0,
+                100000.0
+            ]
+        ]
+    }
+}

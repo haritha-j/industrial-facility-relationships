@@ -368,7 +368,8 @@ def visualize_point_clouds_with_bboxes_and_cameras(pc1, pc2=None, pc3=None, bbox
     """
     b = len(pc1)
     #colours = [[251, 100, 10], [200, 200, 20], [2, 222, 174]] #red, yellow, green
-    colours = [[2, 222, 174], [150, 75, 150], [251, 86, 7]]
+    # red for completed bboxes, green for gt bboxes, yellow for low-confidence bboxes
+    colours = [[255, 0, 0], [0, 255, 0], [255, 170, 0]]
     #colours = [[251, 100, 10], [200, 200, 20], [2, 222, 174]]
     #colours = [[202, 168, 245], [251, 86, 7], [2, 174, 174]]
     colours = [rgb_to_float(colour) for colour in colours]

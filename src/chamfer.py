@@ -3631,18 +3631,19 @@ def calc_dcd_correspondence_tensor(x, y, k=32, return_assignment=False, return_d
     )
 
     eps = 0.00001
-    batch_size, point_count, _ = x.shape
+    batch_size, point_count_x, _ = x.shape
+    _, point_count_y, _ = y.shape
 
     # softmaxed_0 = torch.nn.functional.softmax(1/(nn[0].dists+eps), dim=-1)
     # softmaxed_1 = torch.nn.functional.softmax(1/(nn[1].dists+eps), dim=-1)
     softmaxed_0 = torch.nn.functional.softmin(nn[0].dists, dim=-1)
     softmaxed_1 = torch.nn.functional.softmin(nn[1].dists, dim=-1)
 
-    point_weights_1 = torch.zeros(batch_size, point_count, dtype=torch.float64).cuda()
+    point_weights_1 = torch.zeros(batch_size, point_count_y, dtype=torch.float).cuda()
     for i in range(batch_size):
         point_weights_1[i].scatter_add_(0, nn[0].idx[i].flatten(), softmaxed_0[i].flatten())
 
-    point_weights_0 = torch.zeros(batch_size, point_count, dtype=torch.float64).cuda()
+    point_weights_0 = torch.zeros(batch_size, point_count_x, dtype=torch.float).cuda()
     for i in range(batch_size):
         point_weights_0[i].scatter_add_(0, nn[1].idx[i].flatten(), softmaxed_1[i].flatten())
 
@@ -3669,19 +3670,24 @@ def calc_dcd_correspondence_tensor(x, y, k=32, return_assignment=False, return_d
     distances2 = - torch.log(torch.exp(-0.5 * d2)/(torch.sum(torch.exp(-0.5 * d2) + 1e-7,dim=-1).unsqueeze(-1))**1e-7)
 
     infocd =  (torch.sum(distances1) + torch.sum(distances2)) / 2
-    infocd = infocd / (batch_size * point_count)
+    infocd = infocd / (batch_size * point_count_x)
 
     # return infocd
 
-    # dcd = torch.sum(torch.sqrt(min_dist_1)) + torch.sum(torch.sqrt(min_dist_0))
-    # dcd = dcd / (batch_size * point_count)
+    #dcd = torch.sum(torch.sqrt(min_dist_1)) + torch.sum(torch.sqrt(min_dist_0))
+    dcd = torch.sum(min_dist_1)
+    dcd = dcd / (batch_size * point_count_x)
 
     # corresponding_weights_1 = point_weights_0.gather(1, nn[1].idx)
 
     #print("corres", corresponding_weights_0.shape, i0.shape, min_dist_0.shape)
 
+    bidirectional_dist =  torch.sum(nn[1].dists[:,:,0])
+    bidirectional_dist = bidirectional_dist / (batch_size * point_count_x)
+    print("dcd2", dcd.item(), bidirectional_dist.item())
 
-    # print("dcd", dcd.item(), bidirectional_dist.item())
+    if return_dists:
+        return min_dist_0, min_dist_1
 
     if return_assignment:
         min_ind_1 = torch.gather(nn[1].idx, 2, i1.unsqueeze(2).repeat(1,1,k))[:, :, 0]

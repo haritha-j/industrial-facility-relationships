@@ -146,4 +146,10 @@ occluded/
 completion_noisy_low_overlap/
 models/
 output2/
+occluded_ood/
+cloi_inputs/
 tee_fix/
+autoencoder_dataset/
+noise_dataset/
+mesh_dataset/
+tee_vis/

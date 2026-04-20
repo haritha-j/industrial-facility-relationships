@@ -101,7 +101,7 @@ def synthetic_dataset(
     f = open(config, "r")
     config_data = json.load(f)
     output_dir = os.path.join(output_base, element_class)
-    # os.makedirs(output_dir)
+    os.makedirs(os.path.join(output_dir, "ifc"), exist_ok=True)
 
     metadata = {}
     for i in tqdm(range(start, sample_size + start)):
@@ -136,9 +136,9 @@ def synthetic_dataset(
             e = create_cbeam(config_data[element_class], ifc, ifc_info)
 
         metadata[str(i)] = e
-        ifc.write(os.path.join(output_dir, "%d.ifc" % i))
+        ifc.write(os.path.join(output_dir, "ifc", "%d.ifc" % i))
 
-    with open(os.path.join(output_dir, "metadata.json"), "w") as f:
+    with open(os.path.join(output_dir, "ifc", "metadata.json"), "w") as f:
         json.dump(metadata, f)
 
 
@@ -307,11 +307,8 @@ def create_completion_dataset(
     # resample and save_data
     test_path = os.path.join(output_base, element_class, "test")
     train_path = os.path.join(output_base, element_class, "train")
-    try:
-        os.mkdir(test_path)
-        os.mkdir(train_path)
-    except:
-        pass
+    os.makedirs(test_path, exist_ok=True)
+    os.makedirs(train_path, exist_ok=True)
 
     for k in tqdm(train_clouds.keys()):
         sampled_points = random_resample_cloud(
@@ -323,6 +320,11 @@ def create_completion_dataset(
             train_gt[k], density, uniform_sampling
         )
         save_cloud(sampled_points, train_path, k+"_gt")
+        
+        # sampled_points = random_resample_cloud(
+        #     train_gt[k], 32768, uniform_sampling
+        # )
+        # save_cloud(sampled_points, train_path, k+"_gt_l")
 
     for k in tqdm(test_clouds.keys()):
         sampled_points = random_resample_cloud(
@@ -334,3 +336,103 @@ def create_completion_dataset(
             test_gt[k], density, uniform_sampling
         )
         save_cloud(sampled_points, test_path, k+"_gt")
+
+        # sampled_points = random_resample_cloud(
+        #     test_gt[k], 32768, uniform_sampling
+        # )
+        # save_cloud(sampled_points, test_path, k+"_gt_l")
+
+
+
+def create_denoising_dataset(
+    pcd_path,
+    output_base,
+    element_class,
+    num_scans,
+    density,
+    test_split=0.1,
+    uniform_sampling=False,
+    noise_coverage=1.0,
+    noise_factor=0.02,
+):
+    """
+    Creates a dataset for denoising tasks.
+    The ground truth is the complete point cloud (all views merged).
+    The input is the same complete point cloud but with added noise.
+    """
+    # load data
+    scans = os.listdir(pcd_path)
+    unique_files = set()
+    for sc in scans:
+        element = int(sc.split("_")[0])
+        unique_files.add(element)
+
+    count = 0
+    train_clouds = {}
+    train_gt = {}
+    test_clouds = {}
+    test_gt = {}
+    test_point = int(len(unique_files) * (1 - test_split))
+
+    for k, un in enumerate(tqdm(unique_files)):
+        try:
+            # 1. Create ground truth by merging all scans
+            gt = []
+            for i in range(num_scans):
+                file_path = os.path.join(pcd_path, f"{un}_{i}.pcd")
+                pcd = o3d.io.read_point_cloud(file_path)
+                gt.append(np.asarray(pcd.points))
+            
+            merged_gt = np.vstack(gt)
+
+            # 2. Create noisy version from the completely merged ground truth
+            noisy_points = np.copy(merged_gt)
+            
+            # Generate noise for all points
+            noise_vectors = np.random.normal(0, noise_factor, noisy_points.shape)
+            
+            # Select a random subset of points to add noise to
+            subset = np.random.choice(
+                range(noisy_points.shape[0]),
+                int(noisy_points.shape[0] * noise_coverage),
+                replace=False,
+            )
+            noisy_points[subset] += noise_vectors[subset]
+
+            # 3. Add to the appropriate train/test split
+            if k < test_point:
+                train_clouds[str(count)] = noisy_points
+                train_gt[str(count)] = merged_gt
+            else:
+                test_clouds[str(count)] = noisy_points
+                test_gt[str(count)] = merged_gt
+                
+            count += 1
+            
+        except Exception as e:
+            print(f"Error processing element {un}: {e}")
+            continue
+
+    # Create directories
+    test_path = os.path.join(output_base, element_class, "test")
+    train_path = os.path.join(output_base, element_class, "train")
+    os.makedirs(test_path, exist_ok=True)
+    os.makedirs(train_path, exist_ok=True)
+
+    # Resample and save train data
+    print("Saving training data...")
+    for k in tqdm(train_clouds.keys()):
+        sampled_noisy = random_resample_cloud(train_clouds[k], density, uniform_sampling)
+        save_cloud(sampled_noisy, train_path, k)
+
+        sampled_gt = random_resample_cloud(train_gt[k], density, uniform_sampling)
+        save_cloud(sampled_gt, train_path, k + "_gt")
+
+    # Resample and save test data
+    print("Saving testing data...")
+    for k in tqdm(test_clouds.keys()):
+        sampled_noisy = random_resample_cloud(test_clouds[k], density, uniform_sampling)
+        save_cloud(sampled_noisy, test_path, k)
+
+        sampled_gt = random_resample_cloud(test_gt[k], density, uniform_sampling)
+        save_cloud(sampled_gt, test_path, k + "_gt")
