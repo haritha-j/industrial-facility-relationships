@@ -42,9 +42,9 @@ def morph_sphere(src_pcd_tensor, num_points, iterations, learning_rate, stops=[]
     else:
         sphere_points = torch.rand(1, num_points**2, 3, device=cuda,
                                    dtype=torch.double, requires_grad=True)
-        
+
     # save sphere points as pcd
-    point_cloud = o3d.geometry.PointCloud() 
+    point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(sphere_points[0].cpu().detach().numpy())
     o3d.io.write_point_cloud("sphere/sphere.pcd", point_cloud)
 
@@ -89,7 +89,7 @@ def morph_sphere(src_pcd_tensor, num_points, iterations, learning_rate, stops=[]
         elif loss_func == "curvature":
             loss = calc_poisson_ready_loss(src_pcd_tensor, sphere_points, k=16)
         elif loss_func == "cyclic":
-            loss, assignment = calc_dcd_correspondence_tensor(src_pcd_tensor, sphere_points, return_assignment=True)
+            loss, assignment = calc_directional_cd(src_pcd_tensor, sphere_points)
         else:
             print("unspecified loss")
 

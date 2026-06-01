@@ -34,8 +34,8 @@ def parse_args():
     parser.add_argument('--use_cpu', action='store_true', default=False, help='use cpu mode')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size in training')
-    parser.add_argument('--model', default='PointAttn', help='model name [default: PointAttn]')
-    #parser.add_argument('--model', default='pointnet2_cls_ssg', help='model name [default: PointAttn]')
+    #parser.add_argument('--model', default='PointAttn', help='model name [default: PointAttn]')
+    parser.add_argument('--model', default='pointnet2_cls_ssg', help='model name [default: pointnet2_cls_ssg]')
     parser.add_argument('--epoch', default=100, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
     parser.add_argument('--num_point', type=int, default=2048, help='Point Number')
@@ -91,7 +91,9 @@ def main(args):
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
+    #path = Path('occluded/')
     path = Path('occluded/')
+    #path = Path('../experiments/PointAttN/pcds_completed_reconstructed/')
     #savepath = '/content/drive/MyDrive/ElementNet/'
     savepath = 'models/'
     train_transforms = transforms.Compose([
@@ -100,7 +102,7 @@ def main(args):
                     ToTensor()
                     ])
 
-    cat = 'cbeam'
+    cat = 'elbow'
     train_ds = PointCloudData(path, category=cat, transform=train_transforms)
     valid_ds = PointCloudData(path, valid=True, folder='test', category=cat, transform=train_transforms)
     targets = train_ds.targets

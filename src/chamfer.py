@@ -2381,6 +2381,85 @@ def calc_reverse_weighted_cd_tensor(x, y, k=32, return_assignment=False):
         return bidirectional_dist
 
 
+
+def estimate_normals_tensor(pc, k=15):
+    chamferDist = ChamferDistance()
+    nn = chamferDist(pc, pc, bidirectional=False, return_nn=True, k=k+1)
+
+    # Exclude self
+    neighbor_idx = nn[0].idx[:, :, 1:]
+
+    batch_size, num_points, _ = pc.shape
+
+    # Gather neighbors
+    # pc: (B, 1, N, 3) -> broadcast to (B, N, N, 3)
+    # neighbor_idx: (B, N, k, 1) -> (B, N, k, 3)
+    pc_broadcast = pc.unsqueeze(1).expand(-1, num_points, -1, -1)
+    idx_broadcast = neighbor_idx.unsqueeze(-1).expand(-1, -1, -1, 3)
+
+    neighbors = torch.gather(pc_broadcast, dim=2, index=idx_broadcast)
+
+    # Center
+    centered = neighbors - pc.unsqueeze(2) # (B, N, k, 3) - (B, N, 1, 3)
+
+    # Covariance
+    cov = torch.einsum('bnki,bnkj->bnij', centered, centered) / k
+
+    # Add small regularization to avoid NaN
+    cov += 1e-4 * torch.eye(3, device=pc.device).unsqueeze(0).unsqueeze(0)
+
+    # SVD
+    U, S, V = torch.linalg.svd(cov)
+
+    # Normals (eigenvector for smallest eigenvalue)
+    normals = U[:, :, :, 2] # (B, N, 3)
+
+    return normals.detach()
+
+
+def calc_directional_cd(output, gt, gt_normals=None, return_assignment=False):
+    chamferDist = ChamferDistance()
+    nn = chamferDist(
+        output, gt, bidirectional=True, return_nn=True, k=1
+    )
+    #print("input shape", output.shape, gt.shape)
+    #print("gt normals", gt_normals)
+    if gt_normals is None:
+        gt_normals = estimate_normals_tensor(gt, k=15)
+
+    # Forward direction: GT -> Output
+    idx_gt_to_output = torch.squeeze(nn[1].idx, dim=-1)  # (batch, n_gt)
+    idx_expanded_gt = idx_gt_to_output.unsqueeze(-1).expand(-1, -1, 3)
+    matched_output = torch.gather(output, 1, idx_expanded_gt)
+
+    vectors_gt = gt - matched_output
+    dot_products_gt = torch.abs(torch.sum(vectors_gt * gt_normals, dim=-1))
+    base_distances_gt = torch.sqrt(torch.squeeze(nn[1].dists, dim=-1))
+
+    cosine_similarity_gt = dot_products_gt / (base_distances_gt + 1e-8)
+    #print("cosine similarity", cosine_similarity_gt[0][:10])
+    directional_penalty_gt = (2 + cosine_similarity_gt) * base_distances_gt
+    loss_gt_to_output = torch.mean(directional_penalty_gt)
+
+    # Backward direction: Output -> GT
+    idx_output_to_gt = torch.squeeze(nn[0].idx, dim=-1)  # (batch, n_out)
+    idx_expanded = idx_output_to_gt.unsqueeze(-1).expand(-1, -1, 3)
+    matched_gt = torch.gather(gt, 1, idx_expanded)
+    matched_normals = torch.gather(gt_normals, 1, idx_expanded)
+
+    vectors = output - matched_gt
+    dot_products = torch.abs(torch.sum(vectors * matched_normals, dim=-1))
+    base_distances = torch.sqrt(torch.squeeze(nn[0].dists, dim=-1))
+
+    cosine_similarity = dot_products / (base_distances + 1e-8)
+    directional_penalty = (2 + cosine_similarity) * base_distances
+    loss_output_to_gt = torch.mean(directional_penalty)
+
+    #print("directional cd", loss_gt_to_output.item(), loss_output_to_gt.item())
+
+    return loss_gt_to_output + loss_output_to_gt, (idx_output_to_gt, idx_gt_to_output)
+
+
 # weight the distance of each correspondence by the distances to all its correspondences
 def calc_neighbour_weighted_cd_tensor(x, y, k=32, return_assignment=True):
     cuda = torch.device("cuda")

@@ -198,7 +198,7 @@ def scale_node_features(node_features, factor=250):
 # directions (d1, d2, (d3))
 # positions (p1, p2, (p3))
 # the 3rd feature is only present in tees
-def get_node_features(nodes, path, dataset, additional_features, cloi):
+def get_node_features(nodes, path, dataset, additional_features, cloi=False):
     # filter nodes by type
     types = ["FLANGE", "ELBOW", "TEE", "TUBE", "BEND"]
     element_node_ids = {}

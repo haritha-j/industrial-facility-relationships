@@ -28,6 +28,14 @@ def setup_ifc_file(blueprint):
     ifcNew.add(context)
     ifcNew.add(floor)
 
+    #Add other spatial structure elements and relationships so items are properly referenced
+    for site in ifc.by_type("IfcSite"):
+        ifcNew.add(site)
+    for bldg in ifc.by_type("IfcBuilding"):
+        ifcNew.add(bldg)
+    for rel in ifc.by_type("IfcRelAggregates"):
+        ifcNew.add(rel)
+
     return ifcNew
 
 

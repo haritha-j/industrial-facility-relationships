@@ -320,7 +320,7 @@ def create_completion_dataset(
             train_gt[k], density, uniform_sampling
         )
         save_cloud(sampled_points, train_path, k+"_gt")
-        
+
         # sampled_points = random_resample_cloud(
         #     train_gt[k], 32768, uniform_sampling
         # )
@@ -382,15 +382,15 @@ def create_denoising_dataset(
                 file_path = os.path.join(pcd_path, f"{un}_{i}.pcd")
                 pcd = o3d.io.read_point_cloud(file_path)
                 gt.append(np.asarray(pcd.points))
-            
+
             merged_gt = np.vstack(gt)
 
             # 2. Create noisy version from the completely merged ground truth
             noisy_points = np.copy(merged_gt)
-            
+
             # Generate noise for all points
             noise_vectors = np.random.normal(0, noise_factor, noisy_points.shape)
-            
+
             # Select a random subset of points to add noise to
             subset = np.random.choice(
                 range(noisy_points.shape[0]),
@@ -406,9 +406,9 @@ def create_denoising_dataset(
             else:
                 test_clouds[str(count)] = noisy_points
                 test_gt[str(count)] = merged_gt
-                
+
             count += 1
-            
+
         except Exception as e:
             print(f"Error processing element {un}: {e}")
             continue

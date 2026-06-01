@@ -48,7 +48,7 @@ def sample_meshes_to_pcd(input_dir, output_dir, num_points=10000):
 
 # Example usage
 if __name__ == "__main__":
-    element_class = "ibeam"
+    element_class = "pipe"
     INPUT_FOLDER = "../mesh_dataset/" + element_class + "/obj/"   # Replace with your input folder path
     OUTPUT_FOLDER = "../mesh_dataset/" + element_class + "/pcd/"  # Replace with your output folder path
     POINTS_TO_SAMPLE = 100000             # Adjust the sampling density as needed
